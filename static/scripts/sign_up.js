@@ -72,7 +72,8 @@ document.addEventListener("DOMContentLoaded",
             .then(response => response.json())
             .then(NewData => {
                 console.log('Resposta da API:', NewData);
-                alert('Cadastro em progresso...');
+                alert('Cadastro Realizado');
+                window.location.href = '/';
             })
             .catch(error => {
                 console.error('Erro ao cadastrar:', error);
