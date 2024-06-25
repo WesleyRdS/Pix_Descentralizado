@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enviar Mensagem</title>
+</head>
+<body>
+    <h1>Enviar Mensagem para API 2</h1>
+    <form id="messageForm">
+        <label for="message">Mensagem:</label>
+        <input type="text" id="message" name="message" required>
+        <button type="submit">Enviar</button>
+    </form>
+
+    <div id="response"></div>
+
+    <script>
+        document.getElementById('messageForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const message = document.getElementById('message').value;
+
+            try {
+                const response = await fetch('/send-message?message=taok', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erro ao enviar mensagem');
+                }
+
+                const responseData = await response.json();
+                document.getElementById('response').innerText = JSON.stringify(responseData);
+            } catch (error) {
+                console.error('Erro:', error);
+                document.getElementById('response').innerText = 'Erro ao enviar mensagem';
+            }
+        });
+    </script>
+</body>
+</html>

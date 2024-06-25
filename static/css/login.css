@@ -1,0 +1,91 @@
+@charset "UTF-8";
+
+body{
+    background-color: black;
+    background: url(../images/background.jpg) no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
+    display: block;
+}
+/* # is id*/
+div#title{
+    margin: 30px;
+    text-align: center;
+    border-radius: 20px;
+    font-weight: bold;
+    padding: 10px;
+    color: white;
+    font-size: 80px;
+}
+/* . is class*/
+div.flash_alert{
+    background-color: red;
+    font-size: 50px;
+    border-radius: 30px;
+    font-weight: bold;
+    text-align: center;
+}
+
+div#form_background{
+    background-color: white;
+    margin: 5% 35% 35% 35%;
+    text-align: center;
+    border-radius: 20px;
+    font-weight: bold;
+}
+
+div#form_front{
+    background-color: black;
+    margin: 10px;
+    text-align: center;
+    border-radius: 20px;
+    font-weight: bold;
+    padding: 10px;
+    color: white;
+
+}
+
+label{
+    font-size: 30px;
+    font-weight: bold;
+    border-radius: 10px;
+}
+
+input{
+    border-radius: 20px;
+    font-size: 25px;
+    font-weight: bold;
+}
+
+input:focus{
+    background-color: yellow;
+}
+
+button#btn_login{
+    margin-top: 10px;
+    font-size: 30px;
+    font-weight: bold;
+    border-radius: 20px;
+    background-color: white;
+    color: black;
+}
+
+button#btn_logout{
+    font-size: 30px;
+    font-weight: bold;
+    border-radius: 20px;
+    background-color: white;
+    color: black;
+}
+
+button#btn_logout:hover{
+    background-color: rgb(255, 71, 47);
+    color: white;
+    font-size: 40px;
+}
+
+button#btn_login:hover{
+    background-color: greenyellow;
+    color: white;
+    font-size: 40px;
+}

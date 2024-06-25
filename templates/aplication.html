@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, inital-scale=1.0">
+        <title>Home Consortium</title>
+        <link rel="stylesheet" href="css/aplication.css">
+    </head>
+    <body>
+        <div id="title">CBB</div>
+        <div id="form_background">
+            <H1>Opções</H1>
+            <div id="form_front">
+                <p id="field_text_B">Agência-Conta:</p>
+                <div id="acc_field"></div>
+                <p id="field_text">Saldo:</p>
+                <div id="balance_field"></div>
+                <form action="/transation_route">
+                    <button type="submit" id="btn_transation">Transferência</button>
+                </form>
+                <form action="/deposit">
+                    <button type="submit" id="btn_deposit">Deposito</button>
+                </form>
+                <form action="/logout">
+                    <button type="submit" id="btn_logout">X</button>
+                </form>
+            </div>
+        </div>
+    </body>
+    <script src="scripts/aplication.js"></script>
+</html>

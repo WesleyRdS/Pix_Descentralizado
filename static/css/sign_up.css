@@ -1,0 +1,123 @@
+@charset "UTF-8";
+
+body{
+    background-color: black;
+    background: url(../images/background.jpg) no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
+    display: block;
+}
+/* # is id*/
+div#title{
+    margin: 30px;
+    text-align: center;
+    border-radius: 20px;
+    font-weight: bold;
+    padding: 10px;
+    color: white;
+    font-size: 80px;
+}
+
+div#form_background{
+    background-color: white;
+    margin: 5% 35% 35% 35%;
+    text-align: center;
+    border-radius: 20px;
+    font-weight: bold;
+}
+
+div#form_front{
+    background-color: black;
+    margin: 10px;
+    text-align: center;
+    border-radius: 20px;
+    font-weight: bold;
+    padding: 10px;
+    color: white;
+    font-size: 15px;
+
+}
+
+
+button#btn_sign_up{
+    font-size: 30px;
+    font-weight: bold;
+    border-radius: 20px;
+    background-color: white;
+    color: black;
+}
+
+button#btn_login{
+    font-size: 30px;
+    font-weight: bold;
+    border-radius: 20px;
+    background-color: white;
+    color: black;
+}
+
+
+button#add_cpf{
+    margin-top: 10px;
+    margin-bottom: 10px;
+    font-weight: bold;
+    border-radius: 20px;
+    background-color: white;
+    color: black;
+}
+
+button#remove_cpf{
+    margin-top: 10px;
+    margin-bottom: 10px;
+    font-weight: bold;
+    border-radius: 20px;
+    background-color: white;
+    color: black;
+}
+
+button#add_cpf:hover{
+    background-color: greenyellow;
+    color: white;
+    font-size: 25px;
+}
+
+button#remove_cpf:hover{
+    background-color: rgb(255, 71, 47);
+    color: white;
+    font-size: 25px;
+}
+
+button#btn_sign_up:hover{
+    background-color: greenyellow;
+    color: white;
+    font-size: 40px;
+}
+
+button#btn_login:hover{
+    background-color: rgb(255, 71, 47);
+    color: white;
+    font-size: 40px;
+}
+
+div.flash_alert{
+    background-color: red;
+    font-size: 50px;
+    border-radius: 30px;
+    font-weight: bold;
+    text-align: center;
+}
+
+div.flash_confirmation{
+    background-color: greenyellow;;
+    font-size: 50px;
+    border-radius: 30px;
+    font-weight: bold;
+    text-align: center;
+}
+
+
+
+input{
+    border-radius: 20px;
+    font-size: 15px;
+    font-weight: bold;
+}

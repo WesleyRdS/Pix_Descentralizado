@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, inital-scale=1.0">
+        <title>Login Consortium</title>
+        <link rel="stylesheet" href="css/login.css">
+    </head>
+    <body>
+        <div id="title">CBB</div>
+        <div id="form_background">
+            <h1>LOGIN</h1>
+            <div id="form_front">
+                <form id="login" method="post">
+                    <label for="agency">AG:</label>
+                    <input type="text" name="agency" id="agency" required placeholder="Digite sua agência">
+                    <label for="account">ACC:</label>
+                    <input type="text" name="account" id="account" required placeholder="Digite sua conta">
+                    <label for="Key">PASSWORD:</label>
+                    <input type="password" name="Key" id="Key" required placeholder="Digite sua senha">
+                    <br><button type="submit" id="btn_login">
+                        <span></span>
+                        <span></span>
+                        <span></span>Sign In
+                    </button>
+                </form>
+                <form action="/sign_up">
+                    <br><button type="submit" id="btn_logout">
+                        <span></span>
+                        <span></span>
+                        <span></span>Sign Up
+                    </button>
+                </form>
+            </div>
+        </div>
+        <script src="scripts/login.js"></script>
+    </body>
+</html>
