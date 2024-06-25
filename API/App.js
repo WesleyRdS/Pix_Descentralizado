@@ -19,32 +19,51 @@ app.use(session({
     resave: false,
     saveUninitialized: true
 }));
+
+app.set('views', path.join(__dirname, '../templates'));
+app.set('view engine', 'ejs');
 app.use(express.static(path.join(__dirname, '../static')));
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../templates', 'login.html'));
+    if(req.session.user){
+        res.sendFile(path.join(__dirname, '../templates', 'aplication.html'));     
+    }else{
+        res.sendFile(path.join(__dirname, '../templates', 'login.html'));
+    }
 });
 
 app.get('/sign_up', (req, res) =>{
-    res.sendFile(path.join(__dirname, '../templates', 'sign_up.html'));
+    if(req.session.user){
+        res.sendFile(path.join(__dirname, '../templates', 'aplication.html'));     
+    }else{
+        res.sendFile(path.join(__dirname, '../templates', 'sign_up.html'));
+    }
 });
 
 app.get('/Confirm', (req, res) =>{
-    res.json({ message: 'Login bem-sucedido!' });
+    if(req.session.user){
+        res.json({ message: 'Login bem-sucedido!' });
+    }else{
+    res.sendFile(path.join(__dirname, '../templates', 'login.html'));
+    }
 });
 
 app.get('/perfil', async(req, res) =>{
     if(req.session.user){
-        const data = {
-            agency : req.session.user.agency,
-            account : req.session.user.account,
-            balance : req.session.user.real_balance
-        }
-        res.sendFile(path.join(__dirname, '../templates', 'aplication.html'), data);
-        
+        res.sendFile(path.join(__dirname, '../templates', 'aplication.html'));     
+    }else{
+        res.sendFile(path.join(__dirname, '../templates', 'login.html'));
     }
+});
 
-    
+app.post('/perfil_data', (req, res) => {
+    // Suponha que você tenha um endpoint para obter os dados do perfil
+    const data = {
+        agency : req.session.user.agency,
+        account : req.session.user.account,
+        balance : req.session.user.real_balance
+    }
+    res.json(data);
 });
 
 app.post('/add_user', async(req, res) => {
