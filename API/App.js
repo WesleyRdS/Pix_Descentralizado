@@ -5,12 +5,14 @@ const session = require('express-session')
 const axios = require('axios');
 const bodyParser = require('body-parser');
 const path = require('path');
+const { compile } = require('ejs');
 
 const app = express();
 const IP = process.env.IP || "127.0.0.1"
 const porta = process.env.PORT || 3000;
 const chave = process.env.API_KEY;
 var data_base = []
+var queue_transaction = [];
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -57,11 +59,12 @@ app.get('/perfil', async(req, res) =>{
 });
 
 app.post('/perfil_data', (req, res) => {
-    // Suponha que você tenha um endpoint para obter os dados do perfil
+
+    const user = data_base.find(search_user => search_user.account === req.session.user.account && search_user.agency === req.session.user.agency && search_user.id_client === req.session.user.id_client);
     const data = {
-        agency : req.session.user.agency,
-        account : req.session.user.account,
-        balance : req.session.user.real_balance
+        agency : user.agency,
+        account : user.account,
+        balance : user.real_balance
     }
     res.json(data);
 });
@@ -69,7 +72,7 @@ app.post('/perfil_data', (req, res) => {
 app.post('/add_user', async(req, res) => {
     const { type_person, data_person, agency, keyword  } = req.body;
     console.log(`Mensagem recebida: ${JSON.stringify(data_person)}`);
-    console.log("senha: "+keyword)
+    console.log("senha: "+keyword);
     res.json({ received: true });
     if(agency == IP){
         console.log("Reconheceu que é o mesmo ip");
@@ -100,10 +103,10 @@ app.post('/add_user', async(req, res) => {
             }
             data_base.push(new_cliente);
         }else if(data_person){
-            console.log("Reconheceu conta simples ou empresarial")
+            console.log("Reconheceu conta");
             for(const if_account of data_base){
                 if(data_person[0].acc_value == if_account.id_client){
-                    return 0;
+                    res.status(404).json({ error: 'Usuario ja cadastrado' });
                 }
             }
             const new_cliente = {
@@ -120,7 +123,7 @@ app.post('/add_user', async(req, res) => {
             }
             data_base.push(new_cliente);
         }else{
-            res.redirect('/sign_up')
+            res.redirect('/sign_up');
         }
     }else{
         try {
@@ -131,27 +134,38 @@ app.post('/add_user', async(req, res) => {
         }
     }
 
-    console.log(data_base)
+    console.log(data_base);
     
 
 });
 
 app.post('/login', async(req, res) => {
     const { ag, acc, keyword } = req.body;
-    console.log(ag+"-"+acc+"-"+keyword);
+
     const user = data_base.find(search_user => search_user.account === acc && search_user.agency === ag && search_user.password === keyword);
-    console.log(user)
+    console.log("Usuario encontrado: "+user.account+ " / O login será realizado");
     if(user){
         req.session.user = user;
-        res.redirect('/Confirm')
+        res.redirect('/Confirm');
     }else {
-        console.log("Aqui deu merda")
-        res.send('Credenciais inválidas. <a href="/">Tente novamente</a>');
+
+        res.status(404).json({ error: 'Credenciais invalidas' });
     }
 });
 
+app.get('/logout', (req, res) => {
+    req.session.destroy(err => {
+        if (err) {
+            console.log("Erro: "+err);
+            res.status(404).json({ error: 'Sessão não pode ser encerrada..Tente novamente' });
+        } else {
+            res.redirect('/');
+        }
+    });
+});
+
 app.post('/send-message', async (req, res) => {
-    const { message } = req.query; // Pegando 'message' da query parameter
+    const { message } = req.query; 
   
     try {
         const response = await axios.post(`http://${IP}:${porta}/receive-message`, { message });
@@ -169,13 +183,81 @@ app.post('/receive-message', (req, res) => {
 });
 
 
-// Inicia o servidor na porta especificada
+app.get('/deposit', (req, res) => {
+    if(req.session.user){
+        res.sendFile(path.join(__dirname, '../templates', 'deposit.html'));     
+    }
+    else{
+        res.sendFile(path.join(__dirname, '../templates', 'login.html')); 
+    }
+});
+
+app.post('/deposit_process', (req, res) => {
+    const { account, cpf_cnpj, deposit } = req.body;
+    const user = data_base.find(search_user => search_user.account === account && search_user.id_client === cpf_cnpj);
+
+    console.log("Conta do usuario: "+user.account)
+    if (user) {
+        const index = data_base.indexOf(user);
+       
+        console.log(data_base[index].state_locking )
+        while (data_base[index].state_locking !== "Adquirir_Bloqueio_Escrita") {
+            if (data_base[index].state_locking === "Livre" && data_base[index].state_commit === "Inicial") {
+                data_base[index].state_locking = "Adquirir_Bloqueio_Leitura";
+                data_base[index].state_commit = "Compromisso";
+                data_base[index].sudo = req.session.user.id_client;
+            } else if (data_base[index].state_locking === "Adquirir_Bloqueio_Leitura" && data_base[index].state_commit === "Compromisso" && "sudo" in data_base[index]) {
+                data_base[index].state_locking = "Adquirir_Bloqueio_Escrita";
+            } else {
+                res.status(500).send('Não foi possível completar o depósito.');
+                break;
+            }
+  
+        }
+
+        while (data_base[index].state_locking !== "Livre" && data_base[index].state_commit !== "Inicial" && "sudo" in data_base[index]) {
+            if (data_base[index].state_locking === "Adquirir_Bloqueio_Escrita" && data_base[index].transaction_balance === 0) {
+                data_base[index].transaction_balance = data_base[index].real_balance + Number(deposit);
+            } else if (data_base[index].transaction_balance - data_base[index].real_balance === Number(deposit)) {
+                data_base[index].real_balance = data_base[index].transaction_balance;
+                data_base[index].atomicity = data_base[index].real_balance - data_base[index].transaction_balance;
+            } else if (data_base[index].atomicity === 0 && data_base[index].state_locking !== "Liberar_Bloqueio_Escrita" && data_base[index].state_locking !== "Liberar_Bloqueio_Leitura") {
+                data_base[index].state_locking = "Liberar_Bloqueio_Escrita";
+            } else if (data_base[index].state_locking === "Liberar_Bloqueio_Escrita") {
+                data_base[index].state_locking = "Liberar_Bloqueio_Leitura";
+                data_base[index].transaction_balance = 0;
+            } else if (data_base[index].state_locking === "Liberar_Bloqueio_Leitura" && data_base[index].transaction_balance === 0 && "sudo" in data_base[index]) {
+                data_base[index].state_locking = "Livre";
+                data_base[index].state_commit = "Inicial";
+            } else {
+                res.status(500).json('Não foi possível completar o depósito.');
+                break;
+            }
+
+        }
+        if (data_base[index].state_locking === "Livre" && data_base[index].state_commit === "Inicial" && "sudo" in data_base[index]) {
+            delete data_base[index].sudo;
+            const response = {
+                status: 'success',
+                message: 'Depósito processado com sucesso',
+
+            };
+        
+            res.status(200).json(response);
+        } else {
+            res.status(500).json('Não foi possível completar o depósito.');
+        }
+    } else {
+        res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+});
+
+
 app.listen(porta, () => {
-    console.log(`API 1 está rodando na porta ${porta}`);
+    console.log(`API está rodando na porta ${porta}`);
 });
 
 function make_account_number(ag){
-    console.log(ag);
     aux = ag.replace(".", data_base.length);
     return aux;
 }
