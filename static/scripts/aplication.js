@@ -31,3 +31,8 @@ fetch('/perfil_data', {
     console.error('Erro ao obter dato:', error);
     alert('Erro ao obter datdo')
 });
+
+getElementById('btn_transation').addEventListener('click', function(event) {
+    event.preventDefault(); 
+    window.location.href = '/pix_page'; 
+});

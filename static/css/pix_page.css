@@ -39,7 +39,8 @@ div#form_front{
 }
 
 
-button#btn_sign_up{
+button#btn_pix{
+    margin-top: 10px;
     font-size: 30px;
     font-weight: bold;
     border-radius: 20px;
@@ -47,7 +48,16 @@ button#btn_sign_up{
     color: black;
 }
 
-button#btn_login{
+
+button#btn_pix:hover{
+    background-color: greenyellow;
+    color: white;
+    font-size: 40px;
+}
+
+
+button#btn_back_aplication{
+    margin-top: 10px;
     font-size: 30px;
     font-weight: bold;
     border-radius: 20px;
@@ -56,48 +66,11 @@ button#btn_login{
 }
 
 
-button#add_cpf{
-    margin-top: 10px;
-    margin-bottom: 10px;
-    font-weight: bold;
-    border-radius: 20px;
-    background-color: white;
-    color: black;
-}
-
-button#remove_cpf{
-    margin-top: 10px;
-    margin-bottom: 10px;
-    font-weight: bold;
-    border-radius: 20px;
-    background-color: white;
-    color: black;
-}
-
-button#add_cpf:hover{
-    background-color: greenyellow;
-    color: white;
-    font-size: 25px;
-}
-
-button#remove_cpf:hover{
-    background-color: rgb(255, 71, 47);
-    color: white;
-    font-size: 25px;
-}
-
-button#btn_sign_up:hover{
-    background-color: greenyellow;
-    color: white;
-    font-size: 40px;
-}
-
-button#btn_login:hover{
+button#btn_back_aplication:hover{
     background-color: rgb(255, 71, 47);
     color: white;
     font-size: 40px;
 }
-
 
 input{
     border-radius: 20px;

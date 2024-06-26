@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIX</title>
+    <link rel="stylesheet" href="css/pix_page.css">
+</head>
+<body>
+    <div id="title">CBB</div>
+    <div id="form_background">
+        <h1>Transações PIX</h1>
+        <div id="form_front">
+            <form id="PIXform" action="/PIXprocess" method="post">
+                <label for="accsDropdown">Selecione a contas:</label>
+                <select id="accsDropdown" name="accs">
+                    <option value="">Selecione a conta</option>
+                </select>
+                <button type="submit" id="btn_pix">Transferir</button>
+            </form>
+            <form action="/aplication_back">
+                <button type="submit" id="btn_back_aplication">Voltar</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="scripts/pix_page.js"></script>
+</body>
+</html>

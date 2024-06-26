@@ -6,6 +6,7 @@ const axios = require('axios');
 const bodyParser = require('body-parser');
 const path = require('path');
 const { compile } = require('ejs');
+const { measureMemory } = require('vm');
 
 const app = express();
 const IP = process.env.IP || "127.0.0.1"
@@ -13,6 +14,7 @@ const porta = process.env.PORT || 3000;
 const chave = process.env.API_KEY;
 var data_base = []
 var queue_transaction = [];
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -67,6 +69,36 @@ app.post('/perfil_data', (req, res) => {
         balance : user.real_balance
     }
     res.json(data);
+});
+
+app.get('/pix_page', async(req, res) =>{
+    if(req.session.user){
+        res.sendFile(path.join(__dirname, '../templates', 'pix_page.html'));     
+    }else{
+        res.sendFile(path.join(__dirname, '../templates', 'login.html'));
+    }
+})
+
+function return_accs(compare){
+    const users = []
+    for(var i = 0; i < data_base.length; i++){
+        console.log("Usuario comparado"+data_base[i].id_client);
+        const person = data_base[i].id_client.split("@");
+        for(var j = 0; j < person.length; j++){
+            if(person[j] === compare){
+                users.push(data_base[i]);
+            }
+        }
+    }
+    return users
+}
+
+app.post('/PIXprocess', (req, res) => {
+    const users = return_accs(req.session.user.id_client)
+    if(users.length > 0){
+        console.log(users)
+        res.json(users)
+    }
 });
 
 app.post('/add_user', async(req, res) => {
@@ -164,20 +196,24 @@ app.get('/logout', (req, res) => {
     });
 });
 
-app.post('/send-message', async (req, res) => {
-    const { message } = req.query; 
-  
+async function sendMessageToOtherAPI(message, ip) {
     try {
-        const response = await axios.post(`http://${IP}:${porta}/receive-message`, { message });
-        res.json({ success: true, response: response.data });
+        const response = await axios.post(`http://${ip}:9985/receive-message`, { message });
+        return { success: true, response: response.data };
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        return { success: false, error: error.message };
     }
-});
+}
 
 
 app.post('/receive-message', (req, res) => {
     const { message } = req.body;
+    const aux = measureMemory.split(":");
+    var data;
+    if(aux[0] === "identifier:"){
+        data = return_accs(aux[1])
+    }
+    queue_transaction.push(data)
     console.log(`Mensagem recebida: ${message}`);
     res.json({ received: true });
 });
