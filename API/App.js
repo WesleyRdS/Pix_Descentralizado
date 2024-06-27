@@ -103,8 +103,6 @@ app.post('/PIXprocess', (req, res) => {
 
 app.post('/add_user', async(req, res) => {
     const { type_person, data_person, agency, keyword  } = req.body;
-    console.log(`Mensagem recebida: ${JSON.stringify(data_person)}`);
-    console.log("senha: "+keyword);
     if(agency == IP){
         console.log("Reconheceu que é o mesmo ip");
         if(data_person && data_person.length > 1){
@@ -170,7 +168,13 @@ app.post('/add_user', async(req, res) => {
         }
     }else{
         try {
-            const response = await axios.post(`http://${agency}:${porta}/add_user`, { req });
+            const response = await axios.post(`http://${agency}:8855/add_user`, {
+                type_person: req.body.type_person,
+                data_person: req.body.data_person,
+                agency: req.body.agency,
+                keyword: req.body.keyword
+            });
+            console.log(response.data)
             res.json({ success: true, response: response.data });
         } catch (error) {
             res.status(500).json({ success: false, error: error.req });

@@ -61,6 +61,17 @@ document.addEventListener("DOMContentLoaded",
                 }
 
             }
+            const controller = new AbortController();
+            const signal = controller.signal;
+
+            // Define um tempo limite para a requisição (em milissegundos)
+            const timeout = 10000; // 10 segundos
+
+            // Cria um timer para abortar a requisição após o tempo limite
+            const timeoutId = setTimeout(() => {
+                controller.abort(); // Aborta a requisição
+            }, timeout);
+
 
             fetch("/add_user", {
                 method: 'POST',
@@ -70,6 +81,8 @@ document.addEventListener("DOMContentLoaded",
                 body: JSON.stringify(forms)
             })
             .then(response => {
+                clearTimeout(timeoutId);
+
                 if (!response.ok) {
                     throw new Error('Falha ao cadastrar usuário: ' + response.statusText);
                 }
