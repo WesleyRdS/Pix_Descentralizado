@@ -14,7 +14,7 @@ const porta = process.env.PORT || 3000;
 const chave = process.env.API_KEY;
 var data_base = []
 var queue_transaction = [];
-const data = ["127.0.0.1", "10.0.0.102"]
+const data_routes = ["127.0.0.1"];
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -93,13 +93,30 @@ function return_accs(compare){
     return users
 }
 
-app.post('/PIXprocess', (req, res) => {
-    const users = return_accs(req.session.user.id_client)
-    if(users.length > 0){
-        console.log(users)
-        res.json(users)
+app.post('/PIXprocess', async (req, res) => {
+    var data = [];
+
+    try {
+        const sendMessagePromises = data_routes.map(ip => sendMessageToOtherAPI("identifier:" + req.session.user.id_client, ip));
+
+        const results = await Promise.all(sendMessagePromises);
+
+        results.forEach(result => {
+            if (result.success && result.response.data) {
+                data = data.concat(result.response.data);
+            }
+        });
+
+
+        console.log("Usuários transferiveis:", data);
+        res.json(data);
+    } catch (error) {
+        console.error('Erro ao processar PIX:', error);
+        res.status(500).json({ success: false, error: 'Erro ao processar PIX' });
     }
 });
+
+
 
 app.post('/add_user', async(req, res) => {
     const { type_person, data_person, agency, keyword  } = req.body;
@@ -213,7 +230,7 @@ app.get('/logout', (req, res) => {
 
 async function sendMessageToOtherAPI(message, ip) {
     try {
-        const response = await axios.post(`http://${ip}:9985/receive-message`, { message });
+        const response = await axios.post(`http://${ip}:${porta}/receive-message`, { message : message});
         return { success: true, response: response.data };
     } catch (error) {
         return { success: false, error: error.message };
@@ -223,14 +240,14 @@ async function sendMessageToOtherAPI(message, ip) {
 
 app.post('/receive-message', (req, res) => {
     const { message } = req.body;
-    const aux = measureMemory.split(":");
+    const aux = message.split(":");
     var data;
-    if(aux[0] === "identifier:"){
+    if(aux[0] === "identifier"){
         data = return_accs(aux[1])
     }
     queue_transaction.push(data)
     console.log(`Mensagem recebida: ${message}`);
-    res.json({ received: true });
+    res.json({ received: true, data: data });
 });
 
 
