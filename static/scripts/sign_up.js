@@ -69,7 +69,12 @@ document.addEventListener("DOMContentLoaded",
                 },
                 body: JSON.stringify(forms)
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Falha ao cadastrar usuário: ' + response.statusText);
+                }
+                return response.json();
+            })
             .then(NewData => {
                 console.log('Resposta da API:', NewData);
                 alert('Cadastro Realizado');

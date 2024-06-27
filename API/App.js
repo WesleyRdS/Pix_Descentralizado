@@ -14,7 +14,7 @@ const porta = process.env.PORT || 3000;
 const chave = process.env.API_KEY;
 var data_base = []
 var queue_transaction = [];
-
+const data = ["127.0.0.1", "10.0.0.102"]
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -105,7 +105,6 @@ app.post('/add_user', async(req, res) => {
     const { type_person, data_person, agency, keyword  } = req.body;
     console.log(`Mensagem recebida: ${JSON.stringify(data_person)}`);
     console.log("senha: "+keyword);
-    res.json({ received: true });
     if(agency == IP){
         console.log("Reconheceu que é o mesmo ip");
         if(data_person && data_person.length > 1){
@@ -116,44 +115,56 @@ app.post('/add_user', async(req, res) => {
                 aux_name += "@"+data_person[i].client_name;
                 aux_id += "@"+data_person[i].acc_value;
             }
-            for(const if_account of data_base){
-                if(aux_id == if_account.id_client){
-                    return 0;
+            const user = data_base.find(search_user => search_user.id_client === aux_id);
+            console.log("usuario")
+            console.log(user)
+            if(user){ 
+                console.log("usuario")
+                console.log("ihhh");
+                return res.status(400).json({error: 'Usuario ja cadastrado' });
+            }
+            else{
+                console.log("Entrou")
+                res.json({ received: true });
+                const new_cliente = {
+                    name_client : aux_name,
+                    id_client : aux_id,
+                    agency : agency,
+                    account : make_account_number(agency),
+                    password : keyword,
+                    state_commit: "Inicial",
+                    state_locking: "Livre",
+                    real_balance: 0,
+                    transaction_balance : 0,
+                    atomicity : 0
                 }
+                data_base.push(new_cliente);
+
             }
-            const new_cliente = {
-                name_client : aux_name,
-                id_client : aux_id,
-                agency : data_person.agency,
-                account : make_account_number(data_person.agency),
-                password : keyword,
-                state_commit: "Inicial",
-                state_locking: "Livre",
-                real_balance: 0,
-                transaction_balance : 0,
-                atomicity : 0
-            }
-            data_base.push(new_cliente);
         }else if(data_person){
             console.log("Reconheceu conta");
-            for(const if_account of data_base){
-                if(data_person[0].acc_value == if_account.id_client){
-                    res.status(404).json({ error: 'Usuario ja cadastrado' });
+            const user = data_base.find(search_user => search_user.id_client === data_person[0].acc_value);
+            if(user){ 
+                console.log("ihhh");
+                return res.status(400).json({error: 'Usuario ja cadastrado' });
+            }
+            else{
+                res.json({ received: true });
+                const new_cliente = {
+                    name_client : data_person[0].client_name,
+                    id_client : data_person[0].acc_value,
+                    agency : agency,
+                    account : make_account_number(agency),
+                    password : keyword,
+                    state_commit: "Inicial",
+                    state_locking: "Livre",
+                    real_balance: 0,
+                    transaction_balance : 0,
+                    atomicity : 0
                 }
+                data_base.push(new_cliente);
             }
-            const new_cliente = {
-                name_client : data_person[0].client_name,
-                id_client : data_person[0].acc_value,
-                agency : agency,
-                account : make_account_number(agency),
-                password : keyword,
-                state_commit: "Inicial",
-                state_locking: "Livre",
-                real_balance: 0,
-                transaction_balance : 0,
-                atomicity : 0
-            }
-            data_base.push(new_cliente);
+            
         }else{
             res.redirect('/sign_up');
         }
