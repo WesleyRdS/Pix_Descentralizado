@@ -14,8 +14,19 @@
             <form id="PIXform" action="/PIXprocess" method="post">
                 <label for="accsDropdown">Selecione a contas:</label>
                 <select id="accsDropdown" name="accs">
-                    <option value="">Selecione a conta</option>
+                    <option value="">Selecione a conta remetente</option>
                 </select>
+                <div class="form_group" id="agency_field">
+                    <label for="account">Destino:</label>
+                    <input type="text" name="account" id="account" required placeholder="Conta de destino">
+                </div>
+                <div id="acc_forms_dynamic">
+                    <!--Automatically generated acc inputs -->
+                </div>
+                <div class="form-group" id="add_acc_button">
+                    <button type="button" id="add_acc">+</button>
+                    <button type="button" id="remove_acc">X</button>
+                </div>
                 <button type="submit" id="btn_pix">Transferir</button>
             </form>
             <form action="/aplication_back">
