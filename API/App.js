@@ -237,6 +237,19 @@ async function sendMessageToOtherAPI(message, ip) {
     }
 }
 
+app.post('/pix_prepare', (req, res) => {
+    const pixlist = req.body;
+
+    const data = {
+        pix : pixlist
+    }
+
+    console.log("Sender:", data.pix.accs);
+
+
+    res.sendFile(path.join(__dirname, '../templates', 'aplication.html'));
+});
+
 
 app.post('/receive-message', (req, res) => {
     const { message } = req.body;

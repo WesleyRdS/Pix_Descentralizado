@@ -11,14 +11,18 @@
     <div id="form_background">
         <h1>Transações PIX</h1>
         <div id="form_front">
-            <form id="PIXform" action="/PIXprocess" method="post">
-                <label for="accsDropdown">Selecione a contas:</label>
+            <form id="PIXform" action="/pix_prepare" method="post">
+                <label for="accsDropdown">Remetente</label>
                 <select id="accsDropdown" name="accs">
                     <option value="">Selecione a conta remetente</option>
                 </select>
-                <div class="form_group" id="agency_field">
+                <div class="form_group" id="destiny_field">
                     <label for="account">Destino:</label>
                     <input type="text" name="account" id="account" required placeholder="Conta de destino">
+                </div>
+                <div class="form_group" id="value_field">
+                    <label for="value">Valor:</label>
+                    <input type="text" name="value" id="value" required placeholder="Valor a ser transferido">
                 </div>
                 <div id="acc_forms_dynamic">
                     <!--Automatically generated acc inputs -->
