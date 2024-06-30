@@ -289,7 +289,8 @@ app.post('/pix_prepare', (req, res) => {
 app.post('/pix-execute', async (req, res) => {
     res.status(200).json({ success: 'Transações estão em processamento' });
     while(queue_pix.length > 0){
-        const current_pix = queue_pix.pop();
+        const current_pix = queue_pix[0];
+        console.log("Usuario: "+current_pix)
         var aux_route;
         var response;
         var user = data_base.find(search_user => search_user.account === current_pix[0])
@@ -298,15 +299,17 @@ app.post('/pix-execute', async (req, res) => {
             change_three_phase(current_pix[0], "state_commit", "Esperando Resposta");
             change_three_phase(current_pix[0], "state_locking", "Espera");
             for(let i = 0; i < data_base.length; i++){
-                var route_transfer = make_account_number(data_base[i].account,i);
+                var route_transfer = make_account_number(data_base[i].agency,i);
                 console.log("conta gerada: "+route_transfer)
                 if(route_transfer === current_pix[1]){
-                    aux_route = data_base[i].account;
+                    aux_route = data_base[i].agency;
                     console.log(aux_route)
                 }
             }
-            response = sendMessageToOtherAPI("first_verify:"+current_pix[1], aux_route);
-            if((await response).success && response.data){
+            console.log("TO TTTO")
+            response = await sendMessageToOtherAPI("first_verify:"+current_pix[1], aux_route);
+            console.log(response.data)
+            if(response.success && response.data){
                 if(response.data === "Afirmativo"){
                     change_three_phase(current_pix[0], "state_locking", "Preparado");
                     sendMessageToRoute(IP, "pix-pre-commit")
@@ -337,10 +340,8 @@ function change_three_phase(acc, mode, value){
     for(let n = 0; n < data_base.length; n++){
         if(data_base[n].account === acc){
             data_base[n][mode] = value;
-            return true;
         }
     }
-    return false
 }
 
 app.post('/receive-message', (req, res) => {
