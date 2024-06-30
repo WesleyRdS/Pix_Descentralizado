@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', function() {
         new_acc_div.classList.add("form-group");
     
         var new_select = document.createElement("select");
-        new_select.name = "accs" + acc_index;
+        new_select.name = "sender" + acc_index;
         new_select.id = "accsDropdown" + acc_index;
     
         var default_option = document.createElement("option");
@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
         var new_acc_input = document.createElement("input");
         new_acc_input.type = "text";
-        new_acc_input.name = "acc" + acc_index;
+        new_acc_input.name = "destiny" + acc_index;
         new_acc_input.id = "acc" + acc_index;
         new_acc_input.required = true;
 
@@ -139,6 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("btn_pix").addEventListener("submit", function(event){
         event.preventDefault();
         var pix_array = [];
+        var aux = []
         for(var i = 1; i < ADD_acc_forms_dynamic.childElementCount; i++){
             var pix = {
                 sender : document.getElementById("accsDropdown"+i).value,
@@ -146,25 +147,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 val : document.getElementById("value"+i).value
 
             }
-            pix_array.push(pix);
+            aux.push(pix);
+            pix_array.push(aux);
+            aux.pop
         }
         var new_pix = {
             sender : document.getElementById("accsDropdown").value,
             destiny : document.getElementById("acc").value,
             val : document.getElementById("value").value
         }
-        pix_array.unshift(new_pix);
+        aux.push(new_pix);
+        pix_array.unshift(aux);
+        aux.pop
 
-        var formpix = {
-            pixlist : pix_array
-        }
-        console.log("pixlist")
+        
         fetch('/pix_prepare', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(formpix) 
+            body: JSON.stringify({pix_array}) 
         })
         .then(response => {
 
