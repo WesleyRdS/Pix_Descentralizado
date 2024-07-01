@@ -146,6 +146,7 @@ app.post('/add_user', async(req, res) => {
                 const new_cliente = {
                     name_client : aux_name,
                     id_client : aux_id,
+                    id_login : "",
                     agency : agency,
                     account : make_account_number(agency,data_base.length),
                     password : keyword,
@@ -170,6 +171,7 @@ app.post('/add_user', async(req, res) => {
                 const new_cliente = {
                     name_client : data_person[0].client_name,
                     id_client : data_person[0].acc_value,
+                    id_login : data_person[0].acc_value,
                     agency : agency,
                     account : make_account_number(agency,data_base.length),
                     password : keyword,
@@ -206,11 +208,18 @@ app.post('/add_user', async(req, res) => {
 });
 
 app.post('/login', async(req, res) => {
-    const { ag, acc, keyword } = req.body;
-
+    const { ag, acc, cpf, keyword } = req.body;
+    console.log(cpf);
     const user = data_base.find(search_user => search_user.account === acc && search_user.agency === ag && search_user.password === keyword);
-    console.log("Usuario encontrado: "+user.account+ " / O login será realizado");
-    if(user){
+    const cc = user.id_client.split("@");
+    console.log(cc)
+    for(var itarator in cc){
+        if(cpf === cc[itarator]){
+            change_three_phase(user.account, "id_login", cpf);
+        }
+    }
+    if(user && user.id_login != ""){
+        console.log("Usuario encontrado: "+user.account+ " / O login será realizado");
         req.session.user = user;
         res.redirect('/Confirm');
     }else {
@@ -253,10 +262,22 @@ app.post('/pix_prepare', (req, res) => {
     for(var iterator = 0 ; iterator < n_operations; iterator = iterator + 3){
         if(iterator === 0){
             var aux_route;
-            for(var i = 0; i < data_routes.length; i++){
-                var route_transfer = make_account_number(data_routes[i],i);
-                if(route_transfer === data.pix["sender"]){
-                    aux_route = data_routes[i];
+            for(var i = -1; i < data_routes.length; i++){
+                if(i < 0 && i < data_routes.length -1 ){
+                    var route_transfer = make_account_number(data_routes[i+1],i+1);
+                    if(route_transfer === data.pix["sender"]){
+                        aux_route = data_routes[i+1];
+                        console.log("ROTA GERADA: "+aux_route)
+                        
+                    }
+                }
+                else{
+                    var route_transfer = make_account_number(data_routes[i],i+1);
+                    if(route_transfer === data.pix["sender"]){
+                        aux_route = data_routes[i];
+                        console.log("ROTA GERADA: "+aux_route)
+                        
+                    }
                 }
             }
             const response = sendMessageToOtherAPI("pix_manager:"+data.pix["sender"]+"/"+data.pix["destiny"]+"/"+data.pix["value"], aux_route);
@@ -265,11 +286,20 @@ app.post('/pix_prepare', (req, res) => {
             }
         }else{
             var aux_route;
-            for(var i = 0; i < data_routes.length; i++){
-                var route_transfer = make_account_number(data_routes[i],i);
-                if(route_transfer === data.pix["sender"]){
-                    aux_route = data_routes[i];
+            for(var i = -1; i < data_routes.length; i++){
+                if(i < 0 && i < data_routes.length -1 ){
+                    var route_transfer = make_account_number(data_routes[i+1],i+1);
+                    if(route_transfer === data.pix["sender"]){
+                        aux_route = data_routes[i+1];
+                    }
                 }
+                else{
+                    var route_transfer = make_account_number(data_routes[i],i+1);
+                    if(route_transfer === data.pix["sender"]){
+                        aux_route = data_routes[i];
+                    }
+                }
+                
             }
             const response = sendMessageToOtherAPI("pix_manager:"+data.pix["sender"+iterator/3]+"/"+data.pix["destiny"+iterator/3]+"/"+data.pix["value"+iterator/3], aux_route);
             if(response){
@@ -297,13 +327,23 @@ app.post('/pix-execute', async (req, res) => {
         console.log("achei o user no pix-execute")
         change_three_phase(current_pix[0], "state_commit", "Esperando Resposta");
         change_three_phase(current_pix[0], "state_locking", "Espera");
-        for(let i = 0; i < data_base.length; i++){
-            var route_transfer = make_account_number(data_base[i].agency,i);
-            console.log("conta gerada: "+route_transfer)
-            if(route_transfer === current_pix[1]){
-                aux_route = data_base[i].agency;
-                console.log(aux_route)
+        for(let i = -1; i < data_base.length; i++){
+            if(i < 0 && i < data_routes.length -1 ){
+                var route_transfer = make_account_number(data_base[i+1].agency,i+1);
+                if(route_transfer === current_pix[1]){
+                    aux_route = data_base[i+1].agency;
+                    console.log(aux_route)
+                }
             }
+            else{
+                var route_transfer = make_account_number(data_base[i].agency,i+1);
+                if(route_transfer === current_pix[1]){
+                    aux_route = data_base[i].agency;
+                    console.log(aux_route)
+                }
+            }
+            console.log("conta gerada: "+route_transfer)
+            
         }
         console.log("TO TTTO")
         sendMessageToOtherAPI("first_verify:"+current_pix[1], aux_route)
@@ -356,13 +396,24 @@ app.post("/pix-pre-commit", async (req, res) => {
         change_three_phase(current_pix[0], "state_commit", "Pre-Compromisso");
         change_three_phase(current_pix[0], "state_locking", "Adquirir_Bloqueio_Leitura");
         if(user.real_balance - parseInt(current_pix[2]) >= 0){
-            for(let i = 0; i < data_base.length; i++){
-                var route_transfer = make_account_number(data_base[i].agency,i);
-                console.log("conta gerada: "+route_transfer)
-                if(route_transfer === current_pix[1]){
-                    aux_route = data_base[i].agency;
-                    console.log(aux_route)
+            for(let i = -1; i < data_base.length; i++){
+                if(i < 0 && i < data_routes.length -1 ){
+                    var route_transfer = make_account_number(data_base[i+1].agency,i+1);
+                    console.log("conta gerada: "+route_transfer)
+                    if(route_transfer === current_pix[1]){
+                        aux_route = data_base[i+1].agency;
+                        console.log(aux_route)
+                    }
                 }
+                else{
+                    var route_transfer = make_account_number(data_base[i].agency,i+1);
+                    console.log("conta gerada: "+route_transfer)
+                    if(route_transfer === current_pix[1]){
+                        aux_route = data_base[i].agency;
+                        console.log(aux_route)
+                    }
+                }
+                
             }
             sendMessageToOtherAPI("second_verify:"+current_pix[1], aux_route)
             .then(resposta => {
@@ -416,13 +467,24 @@ app.post("/pix-commit", async(req, res) => {
     if(user.state_commit === "Firmar-Compromisso" && user.state_locking === "Adquirir_Bloqueio_Escrita"){
         change_three_phase(current_pix[0], "state_commit", "Esperando Resposta Final");
         if(user.real_balance - parseInt(current_pix[2]) >= 0){
-            for(let i = 0; i < data_base.length; i++){
-                var route_transfer = make_account_number(data_base[i].agency,i);
-                console.log("conta gerada: "+route_transfer)
-                if(route_transfer === current_pix[1]){
-                    aux_route = data_base[i].agency;
-                    console.log(aux_route)
+            for(let i = -1; i < data_base.length; i++){
+                if(i < 0 && i < data_routes.length -1 ){
+                    var route_transfer = make_account_number(data_base[i+1].agency,i+1);
+                    console.log("conta gerada: "+route_transfer)
+                    if(route_transfer === current_pix[1]){
+                        aux_route = data_base[i+1].agency;
+                        console.log(aux_route)
+                    }
                 }
+                else{
+                    var route_transfer = make_account_number(data_base[i].agency,i+1);
+                    console.log("conta gerada: "+route_transfer)
+                    if(route_transfer === current_pix[1]){
+                        aux_route = data_base[i].agency;
+                        console.log(aux_route)
+                    }
+                }
+                
             }
             sendMessageToOtherAPI("last_verify:"+current_pix[1]+":"+current_pix[2], aux_route)
             .then(resposta => {
@@ -475,13 +537,24 @@ app.post("/pix-complete", async(req, res) =>{
     var user = data_base.find(search_user => search_user.account === current_pix[0]);
     if(user.state_commit === "Completo" && user.state_locking === "Liberar_Bloqueio"){
 
-        for(let i = 0; i < data_base.length; i++){
-            var route_transfer = make_account_number(data_base[i].agency,i);
-            console.log("conta gerada: "+route_transfer)
-            if(route_transfer === current_pix[1]){
-                aux_route = data_base[i].agency;
-                console.log(aux_route)
+        for(let i = -1; i < data_base.length; i++){
+            if(i < 0 && i < data_routes.length -1 ){
+                var route_transfer = make_account_number(data_base[i+1].agency,i+1);
+                console.log("conta gerada: "+route_transfer)
+                if(route_transfer === current_pix[1]){
+                    aux_route = data_base[i+1].agency;
+                    console.log(aux_route)
+                }
             }
+            else{
+                var route_transfer = make_account_number(data_base[i].agency,i+1);
+                console.log("conta gerada: "+route_transfer)
+                if(route_transfer === current_pix[1]){
+                    aux_route = data_base[i].agency;
+                    console.log(aux_route)
+                }
+            }
+            
         }
         sendMessageToOtherAPI("complete:"+current_pix[1]+":"+current_pix[2], aux_route)
         .then(resposta => {
@@ -612,6 +685,7 @@ app.post('/receive-message', (req, res) => {
             change_three_phase(aux[1], "state_locking", "Livre");
             var val = user.transaction_balance;
             change_three_phase(aux[1], "real_balance", val);
+            change_three_phase(aux[1], "transaction_balance", 0);
             change_three_phase(aux[1], "atomicity", 0);
             const msn = "Completo"
             res.json({ received: true, data: msn });
@@ -626,8 +700,8 @@ app.post('/receive-message', (req, res) => {
         change_three_phase(aux[1], "state_commit", "Inicial");
         change_three_phase(aux[1], "state_locking", "Livre");
 
-        if(user.real_balance + user.atomicity === user.transaction_balance){
-            change_three_phase(aux[1], "real_balance", user.transaction_balance);
+        if(user.real_balance === user.transaction_balance){
+            change_three_phase(aux[1], "real_balance", user.transaction_balance - user.atomicity);
         }
 
         change_three_phase(aux[1], "atomicity", 0);
