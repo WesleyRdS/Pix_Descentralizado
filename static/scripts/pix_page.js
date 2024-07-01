@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(NewData => {
             console.log('Resposta da API:', NewData);
             alert('Tranferencia enviada');
-            window.location.href = '/';
+
         })
         .catch(error => {
             console.error('Erro na transferencia:', error);

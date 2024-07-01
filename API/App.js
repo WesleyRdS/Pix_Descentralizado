@@ -279,7 +279,7 @@ app.post('/pix_prepare', (req, res) => {
         }
     }
     if(count_response === n_operations/3){
-        res.status(200).json({ success: 'Transações estão em processamento' });
+        res.sendFile(path.join(__dirname, '../templates', 'pix_page.html'));
         console.log("sucesso: "+queue_pix)
     }else{
         res.status(404).json({ error: 'Erro na transação' });
@@ -292,7 +292,7 @@ app.post('/pix-execute', async (req, res) => {
     const current_pix = queue_pix[0];
     console.log("Usuario: "+current_pix)
     var aux_route;
-    var user = data_base.find(search_user => search_user.account === current_pix[0])
+    var user = data_base.find(search_user => search_user.account === current_pix[0]);
     if(user){
         console.log("achei o user no pix-execute")
         change_three_phase(current_pix[0], "state_commit", "Esperando Resposta");
@@ -317,17 +317,29 @@ app.post('/pix-execute', async (req, res) => {
                 })
                 .catch(error => {
                     console.error('Erro ao enviar para /pix-pre-commit:', error);
+             
                 });
             }else{
                 change_three_phase(current_pix[0], "state_commit", "Inicial");
                 change_three_phase(current_pix[0], "state_locking", "Livre");
                 console.log("Transação pendente, entrando em fila....")
-                queue_pix.pop()
-                queue_pix.push(current_pix);
+                sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route)
+                .then(resposta => {
+                    if(resposta.response.data === "Feito"){
+                        queue_pix.pop()
+                        queue_pix.push(current_pix);
+                    }
+      
+                }).catch(error => {
+                    console.error('Erro:', error);
+              
+                });
+                
             }
         })
         .catch(error => {
             console.error('Erro:', error);
+  
         });
         
     }
@@ -335,10 +347,181 @@ app.post('/pix-execute', async (req, res) => {
     
 });
 
-app.post("/pix-pre-commit", (req, res) => {
-    console.log("Tamo indo bloquear");
+app.post("/pix-pre-commit", async (req, res) => {
+    res.status(200).json({ success: 'Transações estão em processamento' });
+    let aux_route;
+    const current_pix = queue_pix[0];
+    var user = data_base.find(search_user => search_user.account === current_pix[0]);
+    if(user.state_commit === "Esperando Resposta" && user.state_locking === "Preparado"){
+        change_three_phase(current_pix[0], "state_commit", "Pre-Compromisso");
+        change_three_phase(current_pix[0], "state_locking", "Adquirir_Bloqueio_Leitura");
+        if(user.real_balance - parseInt(current_pix[2]) >= 0){
+            for(let i = 0; i < data_base.length; i++){
+                var route_transfer = make_account_number(data_base[i].agency,i);
+                console.log("conta gerada: "+route_transfer)
+                if(route_transfer === current_pix[1]){
+                    aux_route = data_base[i].agency;
+                    console.log(aux_route)
+                }
+            }
+            sendMessageToOtherAPI("second_verify:"+current_pix[1], aux_route)
+            .then(resposta => {
+                console.log('Resposta do servidor:', resposta);
+                if(resposta.response.data === "Permitido"){
+                    change_three_phase(current_pix[0], "state_commit", "Firmar-Compromisso");
+                    change_three_phase(current_pix[0], "state_locking", "Adquirir_Bloqueio_Escrita");
+                    const val = user.real_balance - parseInt(current_pix[2]);
+                    change_three_phase(current_pix[0], "transaction_balance", val);
+                    change_three_phase(current_pix[0], "atomicity", current_pix);
+                    console.log("Valor da transferencia:"+ user.transaction_balance);
+                    sendMessageToRoute(IP, "pix-commit")
+                    .then(result => {
+                        console.log('Resposta de /pix-commit:', result); 
+                    })
+                    .catch(error => {
+                        console.error('Erro ao enviar para /pix-commit:', error);
+
+                    });
+                }else{
+                    change_three_phase(current_pix[0], "state_commit", "Inicial");
+                    change_three_phase(current_pix[0], "state_locking", "Livre");
+                    console.log("Transação pendente, entrando em fila....")
+                    sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route)
+                    .then(resposta => {
+                        if(resposta.response.data === "Feito"){
+                            queue_pix.pop()
+                            queue_pix.push(current_pix);
+               
+                        }
+                    }).catch(error => {
+                        console.error('Erro:', error);
+    
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+
+            });
+        }
+    }
+
 });
 
+app.post("/pix-commit", async(req, res) => {
+    res.status(200).json({ success: 'Transações estão em processamento' });
+    let aux_route;
+    const current_pix = queue_pix[0];
+    var user = data_base.find(search_user => search_user.account === current_pix[0]);
+    if(user.state_commit === "Firmar-Compromisso" && user.state_locking === "Adquirir_Bloqueio_Escrita"){
+        change_three_phase(current_pix[0], "state_commit", "Esperando Resposta Final");
+        if(user.real_balance - parseInt(current_pix[2]) >= 0){
+            for(let i = 0; i < data_base.length; i++){
+                var route_transfer = make_account_number(data_base[i].agency,i);
+                console.log("conta gerada: "+route_transfer)
+                if(route_transfer === current_pix[1]){
+                    aux_route = data_base[i].agency;
+                    console.log(aux_route)
+                }
+            }
+            sendMessageToOtherAPI("last_verify:"+current_pix[1]+":"+current_pix[2], aux_route)
+            .then(resposta => {
+                console.log('Resposta do servidor:', resposta);
+                if(resposta.response.data === "Valor Recebido"){
+                    const val = user.transaction_balance;
+                    change_three_phase(current_pix[0], "real_balance", val);
+                    change_three_phase(current_pix[0], "state_commit", "Completo");
+                    change_three_phase(current_pix[0], "state_locking", "Liberar_Bloqueio");
+                    sendMessageToRoute(IP, "pix-complete")
+                    .then(result => {
+                        console.log('Resposta de /pix-complete:', result); 
+                    })
+                    .catch(error => {
+                        console.error('Erro ao enviar para /pix-complete:', error);
+      
+                    });
+                }
+                else{
+                    change_three_phase(current_pix[0], "state_commit", "Inicial");
+                    change_three_phase(current_pix[0], "state_locking", "Livre");
+                    change_three_phase(current_pix[0], "transaction_balance", 0);
+                    change_three_phase(current_pix[0], "atomicity", 0);
+                    console.log("Transação pendente, entrando em fila....")
+                    sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route)
+                    .then(resposta => {
+                        if(resposta.response.data === "Feito"){
+                            queue_pix.pop()
+                            queue_pix.push(current_pix);
+      
+                        }
+                    }).catch(error => {
+                        console.error('Erro:', error);
+           
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+         
+            });
+        } 
+    }
+});
+
+app.post("/pix-complete", async(req, res) =>{
+    res.status(200).json({ success: 'Transações estão em processamento' });
+    let aux_route;
+    const current_pix = queue_pix[0];
+    var user = data_base.find(search_user => search_user.account === current_pix[0]);
+    if(user.state_commit === "Completo" && user.state_locking === "Liberar_Bloqueio"){
+
+        for(let i = 0; i < data_base.length; i++){
+            var route_transfer = make_account_number(data_base[i].agency,i);
+            console.log("conta gerada: "+route_transfer)
+            if(route_transfer === current_pix[1]){
+                aux_route = data_base[i].agency;
+                console.log(aux_route)
+            }
+        }
+        sendMessageToOtherAPI("complete:"+current_pix[1]+":"+current_pix[2], aux_route)
+        .then(resposta => {
+            console.log('Resposta do servidor:', resposta);
+            if(resposta.response.data === "Completo"){
+                console.log(user.real_balance)
+                change_three_phase(current_pix[0], "state_locking", "Livre");
+                change_three_phase(current_pix[0], "state_commit", "Inicial");
+                change_three_phase(current_pix[0], "atomicity", 0);
+                queue_pix.pop()
+                res.sendFile(path.join(__dirname, '../templates', 'aplication.html'));    
+            }
+            else{
+                change_three_phase(current_pix[0], "state_commit", "Inicial");
+                change_three_phase(current_pix[0], "state_locking", "Livre");
+                change_three_phase(current_pix[0], "transaction_balance", 0);
+                const val = user.real_balance+ current_pix[1];
+                change_three_phase(current_pix[0], "real_balance", val);
+                change_three_phase(current_pix[0], "atomicity", 0);
+                console.log("Transação pendente, entrando em fila....")
+                sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route)
+                .then(resposta => {
+                    if(resposta.response.data === "Feito"){
+                        queue_pix.pop()
+                        queue_pix.push(current_pix);
+             
+                    }
+                }).catch(error => {
+                    console.error('Erro:', error);
+
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+
+        });
+ 
+    }
+});
 
 function change_three_phase(acc, mode, value){
     for(let n = 0; n < data_base.length; n++){
@@ -391,6 +574,69 @@ app.post('/receive-message', (req, res) => {
         }else{
             res.status(500).json('Não foi possível achar o usuario para transferencia.');
         }
+    }
+    else if(aux[0] === "second_verify"){
+        console.log("Entrei no second");
+        const user = data_base.find(search_user => search_user.account == aux[1]);
+        if(user.state_commit === "Esperando Resposta" && user.state_locking === "Adquirir_Bloqueio_Leitura"){
+            change_three_phase(aux[1], "state_commit", "Esperando Resposta Final");
+            change_three_phase(aux[1], "state_locking", "Adquirir_Bloqueio_Escrita");
+            const msn = "Permitido"
+            res.json({ received: true, data: msn });
+        }else{
+            const msn = "Negado"
+            res.json({ received: true, data: msn });
+        }
+    }
+    else if(aux[0] === "last_verify"){
+        console.log("Entrei no last");
+        const user = data_base.find(search_user => search_user.account == aux[1]);
+        if(user.state_commit === "Esperando Resposta Final" && user.state_locking === "Adquirir_Bloqueio_Escrita"){
+            change_three_phase(aux[1], "state_commit", "Completo");
+            change_three_phase(aux[1], "state_locking", "Liberar_Bloqueio");
+            var val = user.real_balance + parseInt(aux[2]);
+            change_three_phase(aux[1], "transaction_balance", val);
+            const msn = "Valor Recebido"
+            res.json({ received: true, data: msn });
+        }else{
+            const msn = "Não Recebido"
+            res.json({ received: true, data: msn });
+        }
+        
+    }
+    else if(aux[0] === "complete"){
+        console.log("Entrei no complete");
+        const user = data_base.find(search_user => search_user.account == aux[1]);
+        if(user.state_commit === "Completo" && user.state_locking === "Liberar_Bloqueio"){
+            change_three_phase(aux[1], "state_commit", "Inicial");
+            change_three_phase(aux[1], "state_locking", "Livre");
+            var val = user.transaction_balance;
+            change_three_phase(aux[1], "real_balance", val);
+            change_three_phase(aux[1], "atomicity", 0);
+            const msn = "Completo"
+            res.json({ received: true, data: msn });
+        }else{
+            const msn = "Falha"
+            res.json({ received: true, data: msn });
+        }
+    }
+    else if(aux[0] === "rollback"){
+        console.log("Entrei no rollback");
+        const user = data_base.find(search_user => search_user.account == aux[1]);
+        change_three_phase(aux[1], "state_commit", "Inicial");
+        change_three_phase(aux[1], "state_locking", "Livre");
+
+        if(user.real_balance + user.atomicity === user.transaction_balance){
+            change_three_phase(aux[1], "real_balance", user.transaction_balance);
+        }
+
+        change_three_phase(aux[1], "atomicity", 0);
+        change_three_phase(aux[1], "transaction_balance", 0);
+        const msn = "Feito"
+        res.json({ received: true, data: msn });
+    }
+    else{
+        console.log("Entrou no else");
     }
     console.log(`Mensagem recebida: ${message}`);
 
