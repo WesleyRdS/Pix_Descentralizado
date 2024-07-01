@@ -288,47 +288,51 @@ app.post('/pix_prepare', (req, res) => {
 
 app.post('/pix-execute', async (req, res) => {
     res.status(200).json({ success: 'Transações estão em processamento' });
-    while(queue_pix.length > 0){
-        const current_pix = queue_pix[0];
-        console.log("Usuario: "+current_pix)
-        var aux_route;
-        var response;
-        var user = data_base.find(search_user => search_user.account === current_pix[0])
-        if(user){
-            console.log("achei o user no pix-execute")
-            change_three_phase(current_pix[0], "state_commit", "Esperando Resposta");
-            change_three_phase(current_pix[0], "state_locking", "Espera");
-            for(let i = 0; i < data_base.length; i++){
-                var route_transfer = make_account_number(data_base[i].agency,i);
-                console.log("conta gerada: "+route_transfer)
-                if(route_transfer === current_pix[1]){
-                    aux_route = data_base[i].agency;
-                    console.log(aux_route)
-                }
-            }
-            console.log("TO TTTO")
-            response = await sendMessageToOtherAPI("first_verify:"+current_pix[1], aux_route);
-            console.log(response.data)
-            if(response.success && response.data){
-                if(response.data === "Afirmativo"){
-                    change_three_phase(current_pix[0], "state_locking", "Preparado");
-                    sendMessageToRoute(IP, "pix-pre-commit")
-                    .then(result => {
-                        console.log('Resposta de /pix-pre-commit:', result); 
-                    })
-                    .catch(error => {
-                        console.error('Erro ao enviar para /pix-pre-commit:', error);
-                    });
-                }else{
-                    change_three_phase(current_pix[0], "state_commit", "Inicial");
-                    change_three_phase(current_pix[0], "state_locking", "Livre");
-                    console.log("Transação pendente, entrando em fila....")
-                    queue_pix.push(current_pix);
-                }
+    
+    const current_pix = queue_pix[0];
+    console.log("Usuario: "+current_pix)
+    var aux_route;
+    var user = data_base.find(search_user => search_user.account === current_pix[0])
+    if(user){
+        console.log("achei o user no pix-execute")
+        change_three_phase(current_pix[0], "state_commit", "Esperando Resposta");
+        change_three_phase(current_pix[0], "state_locking", "Espera");
+        for(let i = 0; i < data_base.length; i++){
+            var route_transfer = make_account_number(data_base[i].agency,i);
+            console.log("conta gerada: "+route_transfer)
+            if(route_transfer === current_pix[1]){
+                aux_route = data_base[i].agency;
+                console.log(aux_route)
             }
         }
-
+        console.log("TO TTTO")
+        sendMessageToOtherAPI("first_verify:"+current_pix[1], aux_route)
+        .then(resposta => {
+            console.log('Resposta do servidor:', resposta);
+            if(resposta.response.data === "Afirmativo"){
+                change_three_phase(current_pix[0], "state_locking", "Preparado");
+                sendMessageToRoute(IP, "pix-pre-commit")
+                .then(result => {
+                    console.log('Resposta de /pix-pre-commit:', result); 
+                })
+                .catch(error => {
+                    console.error('Erro ao enviar para /pix-pre-commit:', error);
+                });
+            }else{
+                change_three_phase(current_pix[0], "state_commit", "Inicial");
+                change_three_phase(current_pix[0], "state_locking", "Livre");
+                console.log("Transação pendente, entrando em fila....")
+                queue_pix.pop()
+                queue_pix.push(current_pix);
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+        });
+        
     }
+
+    
 });
 
 app.post("/pix-pre-commit", (req, res) => {
@@ -369,14 +373,20 @@ app.post('/receive-message', (req, res) => {
         });
     }
     else if(aux[0] == "first_verify"){
+        console.log("entrei no first")
         const user = data_base.find(search_user => search_user.account == aux[1]);
         if(user){
+            console.log("Achei o user")
+            console.log(user.state_commit+"- commit")
+            console.log(user.state_locking+"- locking")
             if(user.state_commit === "Inicial" && user.state_locking === "Livre"){
                 change_three_phase(aux[1], "state_commit", "Esperando Resposta");
                 change_three_phase(aux[1], "state_locking", "Adquirir_Bloqueio_Leitura");
-                res.json({ received: true, data: "Afirmativo" });
+                const msn = "Afirmativo"
+                res.json({ received: true, data: msn });
             }else{
-                res.json({ received: true, data: "Negado" });
+                const msn = "Negado"
+                res.json({ received: true, data: msn });
             }
         }else{
             res.status(500).json('Não foi possível achar o usuario para transferencia.');
