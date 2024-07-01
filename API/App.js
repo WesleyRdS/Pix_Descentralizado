@@ -99,7 +99,7 @@ app.post('/PIXprocess', async (req, res) => {
     var data = [];
 
     try {
-        const sendMessagePromises = data_routes.map(ip => sendMessageToOtherAPI("identifier:" + req.session.user.id_client, ip));
+        const sendMessagePromises = data_routes.map(ip => sendMessageToOtherAPI("identifier:" + req.session.user.id_login, ip));
 
         const results = await Promise.all(sendMessagePromises);
 
