@@ -11,8 +11,8 @@ const { count, Console } = require('console');
 const { captureRejectionSymbol } = require('events');
 
 const app = express();
-const IP = process.env.IP || "127.0.0.1"
-const porta = process.env.PORT || 3000;
+const IP = process.env.IP || "0.0.0.0"
+const porta = process.env.PORT || 9985;
 const chave = process.env.API_KEY;
 var data_base = []
 var queue_transaction = [];
@@ -83,26 +83,25 @@ app.get('/pix_page', async(req, res) =>{
 })
 
 function return_accs(compare, id){
-    console.log("COMPARE: "+compare);
     const users = [];
     for(var i = 0; i < data_base.length; i++){
-        console.log("Usuario comparado: "+data_base[i].id_client);
+
         const v_compare = compare.split("@");
-        console.log("Usuario logado: "+id);
+
         for(var t in v_compare){
             var founduser = users.find(u => u.acc == data_base[i].account);
             if(!founduser){
-                console.log("v compare atual: "+v_compare[t])
+
                 if(v_compare[t] === data_base[i].id_client  && v_compare[t] === id){
                     users.push(data_base[i]);
                 }else if(compare === data_base[i].id_client){
                     users.push(data_base[i])
                 }else{
                     const aux = (data_base[i].id_client).split('@');
-                    console.log("aux atual: "+aux);
+
                     if(aux.length > 1){
                         for(const v in aux){
-                            console.log("aux atual: "+aux[v]);
+
                             if(aux[v] === v_compare[t] && v_compare[t] == id){
                                 users.push(data_base[i]);
                             }
@@ -144,9 +143,9 @@ app.post('/PIXprocess', async (req, res) => {
 app.post('/add_user', async(req, res) => {
     const { type_person, data_person, agency, keyword  } = req.body;
     if(agency == IP){
-        console.log("Reconheceu que é o mesmo ip");
+
         if(data_person && data_person.length > 1){
-            console.log("Reconheceu conta conjunta");
+
             var aux_name = data_person[0].client_name;
             var aux_id = data_person[0].acc_value;
             for(var i = 1; i < data_person.length; i++){
@@ -155,12 +154,12 @@ app.post('/add_user', async(req, res) => {
             }
             const user = data_base.find(search_user => search_user.id_client === aux_id);
             if(user){ 
-                console.log("usuario")
-                console.log("ihhh");
+
+
                 return res.status(400).json({error: 'Usuario ja cadastrado' });
             }
             else{
-                console.log("Entrou")
+
                 res.json({ received: true });
                 const new_cliente = {
                     name_client : aux_name,
@@ -179,10 +178,10 @@ app.post('/add_user', async(req, res) => {
 
             }
         }else if(data_person){
-            console.log("Reconheceu conta");
+
             const user = data_base.find(search_user => search_user.id_client === data_person[0].acc_value);
             if(user){ 
-                console.log("ihhh");
+
                 return res.status(400).json({error: 'Usuario ja cadastrado' });
             }
             else{
@@ -228,10 +227,10 @@ app.post('/add_user', async(req, res) => {
 
 app.post('/login', async(req, res) => {
     const { ag, acc, cpf, keyword } = req.body;
-    console.log(cpf);
+
     const user = data_base.find(search_user => search_user.account === acc && search_user.agency === ag && search_user.password === keyword);
     const cc = user.id_client.split("@");
-    console.log(cc)
+
     for(var itarator in cc){
         if(cpf === cc[itarator]){
             change_three_phase(user.account, "signin", cpf);
@@ -286,7 +285,7 @@ app.post('/pix_prepare', (req, res) => {
                     var route_transfer = make_account_number(data_routes[i+1],i+1);
                     if(route_transfer === data.pix["sender"]){
                         aux_route = data_routes[i+1];
-                        console.log("ROTA GERADA: "+aux_route)
+
                         
                     }
                 }
@@ -294,7 +293,7 @@ app.post('/pix_prepare', (req, res) => {
                     var route_transfer = make_account_number(data_routes[i],i+1);
                     if(route_transfer === data.pix["sender"]){
                         aux_route = data_routes[i];
-                        console.log("ROTA GERADA: "+aux_route)
+
                         
                     }
                 }
@@ -343,7 +342,7 @@ app.post('/pix-execute', async (req, res) => {
     var aux_route;
     var user = data_base.find(search_user => search_user.account === current_pix[0]);
     if(user){
-        console.log("achei o user no pix-execute")
+
         change_three_phase(current_pix[0], "state_commit", "Esperando Resposta");
         change_three_phase(current_pix[0], "state_locking", "Espera");
         for(let i = -1; i < data_base.length; i++){
@@ -351,20 +350,20 @@ app.post('/pix-execute', async (req, res) => {
                 var route_transfer = make_account_number(data_base[i+1].agency,i+1);
                 if(route_transfer === current_pix[1]){
                     aux_route = data_base[i+1].agency;
-                    console.log(aux_route)
+
                 }
             }
             else{
                 var route_transfer = make_account_number(data_base[i].agency,i+1);
                 if(route_transfer === current_pix[1]){
                     aux_route = data_base[i].agency;
-                    console.log(aux_route)
+
                 }
             }
-            console.log("conta gerada: "+route_transfer)
+
             
         }
-        console.log("TO TTTO")
+
         sendMessageToOtherAPI("first_verify:"+current_pix[1], aux_route)
         .then(resposta => {
             console.log('Resposta do servidor:', resposta);
@@ -418,18 +417,18 @@ app.post("/pix-pre-commit", async (req, res) => {
             for(let i = -1; i < data_base.length; i++){
                 if(i < 0 && i < data_routes.length -1 ){
                     var route_transfer = make_account_number(data_base[i+1].agency,i+1);
-                    console.log("conta gerada: "+route_transfer)
+
                     if(route_transfer === current_pix[1]){
                         aux_route = data_base[i+1].agency;
-                        console.log(aux_route)
+             
                     }
                 }
                 else{
                     var route_transfer = make_account_number(data_base[i].agency,i+1);
-                    console.log("conta gerada: "+route_transfer)
+    
                     if(route_transfer === current_pix[1]){
                         aux_route = data_base[i].agency;
-                        console.log(aux_route)
+
                     }
                 }
                 
@@ -442,7 +441,7 @@ app.post("/pix-pre-commit", async (req, res) => {
                     change_three_phase(current_pix[0], "state_locking", "Adquirir_Bloqueio_Escrita");
                     const val = user.real_balance - parseInt(current_pix[2]);
                     change_three_phase(current_pix[0], "transaction_balance", val);
-                    change_three_phase(current_pix[0], "atomicity", current_pix);
+                    change_three_phase(current_pix[0], "atomicity", current_pix[2]);
                     console.log("Valor da transferencia:"+ user.transaction_balance);
                     sendMessageToRoute(IP, "pix-commit")
                     .then(result => {
@@ -489,18 +488,18 @@ app.post("/pix-commit", async(req, res) => {
             for(let i = -1; i < data_base.length; i++){
                 if(i < 0 && i < data_routes.length -1 ){
                     var route_transfer = make_account_number(data_base[i+1].agency,i+1);
-                    console.log("conta gerada: "+route_transfer)
+
                     if(route_transfer === current_pix[1]){
                         aux_route = data_base[i+1].agency;
-                        console.log(aux_route)
+ 
                     }
                 }
                 else{
                     var route_transfer = make_account_number(data_base[i].agency,i+1);
-                    console.log("conta gerada: "+route_transfer)
+       
                     if(route_transfer === current_pix[1]){
                         aux_route = data_base[i].agency;
-                        console.log(aux_route)
+    
                     }
                 }
                 
@@ -559,27 +558,27 @@ app.post("/pix-complete", async(req, res) =>{
         for(let i = -1; i < data_base.length; i++){
             if(i < 0 && i < data_routes.length -1 ){
                 var route_transfer = make_account_number(data_base[i+1].agency,i+1);
-                console.log("conta gerada: "+route_transfer)
+
                 if(route_transfer === current_pix[1]){
                     aux_route = data_base[i+1].agency;
-                    console.log(aux_route)
+
                 }
             }
             else{
                 var route_transfer = make_account_number(data_base[i].agency,i+1);
-                console.log("conta gerada: "+route_transfer)
+
                 if(route_transfer === current_pix[1]){
                     aux_route = data_base[i].agency;
-                    console.log(aux_route)
+  
                 }
             }
             
         }
         sendMessageToOtherAPI("complete:"+current_pix[1]+":"+current_pix[2], aux_route)
         .then(resposta => {
-            console.log('Resposta do servidor:', resposta);
+    
             if(resposta.response.data === "Completo"){
-                console.log(user.real_balance)
+       
                 change_three_phase(current_pix[0], "state_locking", "Livre");
                 change_three_phase(current_pix[0], "state_commit", "Inicial");
                 change_three_phase(current_pix[0], "atomicity", 0);
@@ -590,7 +589,7 @@ app.post("/pix-complete", async(req, res) =>{
                 change_three_phase(current_pix[0], "state_commit", "Inicial");
                 change_three_phase(current_pix[0], "state_locking", "Livre");
                 change_three_phase(current_pix[0], "transaction_balance", 0);
-                const val = user.real_balance+ current_pix[1];
+                const val = user.real_balance + user.atomicity;
                 change_three_phase(current_pix[0], "real_balance", val);
                 change_three_phase(current_pix[0], "atomicity", 0);
                 console.log("Transação pendente, entrando em fila....")
@@ -627,7 +626,7 @@ app.post('/receive-message', (req, res) => {
     const { message } = req.body;
     const aux = message.split(":");
     var data;
-    console.log(aux)
+
     if(aux[0] === "identifier"){
         data = return_accs(aux[1],aux[2]);
         queue_transaction.push(data);
@@ -635,7 +634,7 @@ app.post('/receive-message', (req, res) => {
     }
     else if(aux[0] === "pix_manager"){
         const op_aux = aux[1].split("/");
-        console.log("TAMO AQUI NO RECEIVE DO PIX")
+
         queue_pix.push(op_aux);
         res.json({ received: true, data: queue_pix });
 
@@ -648,10 +647,10 @@ app.post('/receive-message', (req, res) => {
         });
     }
     else if(aux[0] == "first_verify"){
-        console.log("entrei no first")
+  
         const user = data_base.find(search_user => search_user.account == aux[1]);
         if(user){
-            console.log("Achei o user")
+
             console.log(user.state_commit+"- commit")
             console.log(user.state_locking+"- locking")
             if(user.state_commit === "Inicial" && user.state_locking === "Livre"){
@@ -668,7 +667,7 @@ app.post('/receive-message', (req, res) => {
         }
     }
     else if(aux[0] === "second_verify"){
-        console.log("Entrei no second");
+  
         const user = data_base.find(search_user => search_user.account == aux[1]);
         if(user.state_commit === "Esperando Resposta" && user.state_locking === "Adquirir_Bloqueio_Leitura"){
             change_three_phase(aux[1], "state_commit", "Esperando Resposta Final");
@@ -681,13 +680,14 @@ app.post('/receive-message', (req, res) => {
         }
     }
     else if(aux[0] === "last_verify"){
-        console.log("Entrei no last");
+  
         const user = data_base.find(search_user => search_user.account == aux[1]);
         if(user.state_commit === "Esperando Resposta Final" && user.state_locking === "Adquirir_Bloqueio_Escrita"){
             change_three_phase(aux[1], "state_commit", "Completo");
             change_three_phase(aux[1], "state_locking", "Liberar_Bloqueio");
             var val = user.real_balance + parseInt(aux[2]);
             change_three_phase(aux[1], "transaction_balance", val);
+            change_three_phase(aux[1], "atomicity", parseInt(aux[2]));
             const msn = "Valor Recebido"
             res.json({ received: true, data: msn });
         }else{
@@ -697,7 +697,7 @@ app.post('/receive-message', (req, res) => {
         
     }
     else if(aux[0] === "complete"){
-        console.log("Entrei no complete");
+
         const user = data_base.find(search_user => search_user.account == aux[1]);
         if(user.state_commit === "Completo" && user.state_locking === "Liberar_Bloqueio"){
             change_three_phase(aux[1], "state_commit", "Inicial");
@@ -755,16 +755,16 @@ app.get('/deposit', (req, res) => {
 
 app.post('/deposit_process', (req, res) => {
     const { account, deposit } = req.body;
-    console.log(account)
+
     const user = data_base.find(search_user => search_user.account === account);
 
     console.log("usuario: "+ user)
     if (user) {
         const index = data_base.indexOf(user);
-        console.log("Entrei no 1")
-        console.log(data_base[index].state_locking )
+   
+      
         while (data_base[index].state_locking !== "Adquirir_Bloqueio_Escrita") {
-            console.log("Entrei no 2")
+      
             if (data_base[index].state_locking === "Livre" && data_base[index].state_commit === "Inicial") {
                 data_base[index].state_locking = "Adquirir_Bloqueio_Leitura";
                 data_base[index].state_commit = "Compromisso";
@@ -779,7 +779,7 @@ app.post('/deposit_process', (req, res) => {
         }
 
         while (data_base[index].state_locking !== "Livre" && data_base[index].state_commit !== "Inicial" && "sudo" in data_base[index]) {
-            console.log("Entrei no 3")
+      
             if (data_base[index].state_locking === "Adquirir_Bloqueio_Escrita" && data_base[index].transaction_balance === 0) {
                 data_base[index].transaction_balance = data_base[index].real_balance + Number(deposit);
             } else if (data_base[index].transaction_balance - data_base[index].real_balance === Number(deposit)) {
@@ -800,7 +800,7 @@ app.post('/deposit_process', (req, res) => {
 
         }
         if (data_base[index].state_locking === "Livre" && data_base[index].state_commit === "Inicial" && "sudo" in data_base[index]) {
-            console.log("Entrei no 4")
+   
             delete data_base[index].sudo;
             const response = {
                 status: 'success',
