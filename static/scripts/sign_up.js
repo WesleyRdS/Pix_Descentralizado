@@ -24,10 +24,13 @@ document.addEventListener("DOMContentLoaded",
             var new_acc = [];
             var key = document.getElementById("Key").value;
             const identifier_type = document.querySelector('input[name="identifier"]:checked').value;
-            var identifier_value;
+           
             if(identifier_type == "cnpj"){
-                identifier_value = document.getElementById("cnpj").value;
-                new_acc.push(identifier_value);
+                var new_cliente = {
+                    client_name : document.getElementById('client').value,
+                    acc_value : document.getElementById("cnpj").value
+                }
+                new_acc.push(new_cliente);
                 const agency = document.getElementById('agency').value;
                 var forms = {
                     type_person : identifier_type,
