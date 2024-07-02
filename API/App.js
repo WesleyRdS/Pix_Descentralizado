@@ -8,6 +8,7 @@ const path = require('path');
 const { compile } = require('ejs');
 const { measureMemory } = require('vm');
 const { count, Console } = require('console');
+const { captureRejectionSymbol } = require('events');
 
 const app = express();
 const IP = process.env.IP || "127.0.0.1"
@@ -81,14 +82,34 @@ app.get('/pix_page', async(req, res) =>{
     }
 })
 
-function return_accs(compare){
-    const users = []
+function return_accs(compare, id){
+    console.log("COMPARE: "+compare);
+    const users = [];
     for(var i = 0; i < data_base.length; i++){
-        console.log("Usuario comparado"+data_base[i].id_client);
-        const person = data_base[i].id_client.split("@");
-        for(var j = 0; j < person.length; j++){
-            if(person[j] === compare){
-                users.push(data_base[i]);
+        console.log("Usuario comparado: "+data_base[i].id_client);
+        const v_compare = compare.split("@");
+        console.log("Usuario logado: "+id);
+        for(var t in v_compare){
+            var founduser = users.find(u => u.acc == data_base[i].account);
+            if(!founduser){
+                console.log("v compare atual: "+v_compare[t])
+                if(v_compare[t] === data_base[i].id_client  && v_compare[t] === id){
+                    users.push(data_base[i]);
+                }else if(compare === data_base[i].id_client){
+                    users.push(data_base[i])
+                }else{
+                    const aux = (data_base[i].id_client).split('@');
+                    console.log("aux atual: "+aux);
+                    if(aux.length > 1){
+                        for(const v in aux){
+                            console.log("aux atual: "+aux[v]);
+                            if(aux[v] === v_compare[t] && v_compare[t] == id){
+                                users.push(data_base[i]);
+                            }
+                        }
+                    }
+                }
+
             }
         }
     }
@@ -99,7 +120,7 @@ app.post('/PIXprocess', async (req, res) => {
     var data = [];
 
     try {
-        const sendMessagePromises = data_routes.map(ip => sendMessageToOtherAPI("identifier:" + req.session.user.id_login, ip));
+        const sendMessagePromises = data_routes.map(ip => sendMessageToOtherAPI("identifier:" + req.session.user.id_client+":"+req.session.user.signin, ip));
 
         const results = await Promise.all(sendMessagePromises);
 
@@ -133,8 +154,6 @@ app.post('/add_user', async(req, res) => {
                 aux_id += "@"+data_person[i].acc_value;
             }
             const user = data_base.find(search_user => search_user.id_client === aux_id);
-            console.log("usuario")
-            console.log(user)
             if(user){ 
                 console.log("usuario")
                 console.log("ihhh");
@@ -146,7 +165,7 @@ app.post('/add_user', async(req, res) => {
                 const new_cliente = {
                     name_client : aux_name,
                     id_client : aux_id,
-                    id_login : "",
+                    signin : "",
                     agency : agency,
                     account : make_account_number(agency,data_base.length),
                     password : keyword,
@@ -171,7 +190,7 @@ app.post('/add_user', async(req, res) => {
                 const new_cliente = {
                     name_client : data_person[0].client_name,
                     id_client : data_person[0].acc_value,
-                    id_login : data_person[0].acc_value,
+                    signin : data_person[0].acc_value,
                     agency : agency,
                     account : make_account_number(agency,data_base.length),
                     password : keyword,
@@ -215,7 +234,7 @@ app.post('/login', async(req, res) => {
     console.log(cc)
     for(var itarator in cc){
         if(cpf === cc[itarator]){
-            change_three_phase(user.account, "id_login", cpf);
+            change_three_phase(user.account, "signin", cpf);
         }
     }
     if(user && user.id_login != ""){
@@ -610,7 +629,7 @@ app.post('/receive-message', (req, res) => {
     var data;
     console.log(aux)
     if(aux[0] === "identifier"){
-        data = return_accs(aux[1]);
+        data = return_accs(aux[1],aux[2]);
         queue_transaction.push(data);
         res.json({ received: true, data: data });
     }
@@ -735,15 +754,17 @@ app.get('/deposit', (req, res) => {
 });
 
 app.post('/deposit_process', (req, res) => {
-    const { account, cpf_cnpj, deposit } = req.body;
-    const user = data_base.find(search_user => search_user.account === account && search_user.id_client === cpf_cnpj);
+    const { account, deposit } = req.body;
+    console.log(account)
+    const user = data_base.find(search_user => search_user.account === account);
 
-    console.log("Conta do usuario: "+user.account)
+    console.log("usuario: "+ user)
     if (user) {
         const index = data_base.indexOf(user);
-       
+        console.log("Entrei no 1")
         console.log(data_base[index].state_locking )
         while (data_base[index].state_locking !== "Adquirir_Bloqueio_Escrita") {
+            console.log("Entrei no 2")
             if (data_base[index].state_locking === "Livre" && data_base[index].state_commit === "Inicial") {
                 data_base[index].state_locking = "Adquirir_Bloqueio_Leitura";
                 data_base[index].state_commit = "Compromisso";
@@ -758,6 +779,7 @@ app.post('/deposit_process', (req, res) => {
         }
 
         while (data_base[index].state_locking !== "Livre" && data_base[index].state_commit !== "Inicial" && "sudo" in data_base[index]) {
+            console.log("Entrei no 3")
             if (data_base[index].state_locking === "Adquirir_Bloqueio_Escrita" && data_base[index].transaction_balance === 0) {
                 data_base[index].transaction_balance = data_base[index].real_balance + Number(deposit);
             } else if (data_base[index].transaction_balance - data_base[index].real_balance === Number(deposit)) {
@@ -778,6 +800,7 @@ app.post('/deposit_process', (req, res) => {
 
         }
         if (data_base[index].state_locking === "Livre" && data_base[index].state_commit === "Inicial" && "sudo" in data_base[index]) {
+            console.log("Entrei no 4")
             delete data_base[index].sudo;
             const response = {
                 status: 'success',

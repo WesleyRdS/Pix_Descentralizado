@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded",
         const login_agency = document.getElementById("agency");
         const login_account = document.getElementById("account");
         const Key = document.getElementById("Key");
-        const cpf = document.getElementById("cpf")
+        const id = document.getElementById("Identifier")
 
         const login = document.getElementById("login");
 
@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded",
             var forms = {
                 ag : login_agency.value,
                 acc : login_account.value,
-                cpf : cpf.value,
+                cpf : id.value,
                 keyword : Key.value
             }
             console.log(forms)
