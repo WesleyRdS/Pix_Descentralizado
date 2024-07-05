@@ -17,7 +17,9 @@ const chave = process.env.API_KEY;
 var data_base = []
 var queue_transaction = [];
 var queue_pix = [];
-const data_routes = ["127.0.0.1"];
+const data_routes = [
+    "127.0.0.1"
+];
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -266,7 +268,7 @@ async function sendMessageToOtherAPI(message, ip) {
     }
 }
 
-app.post('/pix_prepare', (req, res) => {
+app.post('/pix_prepare', async(req, res) => {
     const pix_array = req.body;
 
     const data = {
@@ -280,46 +282,34 @@ app.post('/pix_prepare', (req, res) => {
     for(var iterator = 0 ; iterator < n_operations; iterator = iterator + 3){
         if(iterator === 0){
             var aux_route;
-            for(var i = -1; i < data_routes.length; i++){
-                if(i < 0 && i < data_routes.length -1 ){
-                    var route_transfer = make_account_number(data_routes[i+1],i+1);
-                    if(route_transfer === data.pix["sender"]){
-                        aux_route = data_routes[i+1];
+            aux_route = data.pix["sender"].split("@");
+            let message = data.pix["sender"]+"/"+data.pix["destiny"]+"/"+data.pix["value"]
+            let response = ""
+            try {
+                response = await axios.post(`http://${aux_route[0]}:${porta}/pix-execute`, { message : message});
 
-                        
-                    }
-                }
-                else{
-                    var route_transfer = make_account_number(data_routes[i],i+1);
-                    if(route_transfer === data.pix["sender"]){
-                        aux_route = data_routes[i];
-
-                        
-                    }
-                }
+            } catch (error) {
+                console.log(`A transação de ${data.pix['sender']} para ${data.pix['destiny']} no valor de R$ ${data.pix['value']} falhou!!`)
             }
-            const response = sendMessageToOtherAPI("pix_manager:"+data.pix["sender"]+"/"+data.pix["destiny"]+"/"+data.pix["value"], aux_route);
-            if(response){
+            if(response != ""){
                 count_response++;
+                response = "";
             }
         }else{
             var aux_route;
-            for(var i = -1; i < data_routes.length; i++){
-                if(i < 0 && i < data_routes.length -1 ){
-                    var route_transfer = make_account_number(data_routes[i+1],i+1);
-                    if(route_transfer === data.pix["sender"]){
-                        aux_route = data_routes[i+1];
-                    }
-                }
-                else{
-                    var route_transfer = make_account_number(data_routes[i],i+1);
-                    if(route_transfer === data.pix["sender"]){
-                        aux_route = data_routes[i];
-                    }
-                }
-                
+            aux_route= data.pix["sender"+iterator/3].split("@");
+            let message = data.pix["sender"+iterator/3]+"/"+data.pix["destiny"+iterator/3]+"/"+data.pix["value"+iterator/3]
+            let response = ""
+            try {
+                response = await axios.post(`http://${aux_route[0]}:${porta}/pix-execute`, { message : message});
+
+            } catch (error) {
+                console.log(`A transação de ${data.pix['sender']} para ${data.pix['destiny']} no valor de R$ ${data.pix['value']} falhou!!`)
             }
-            const response = sendMessageToOtherAPI("pix_manager:"+data.pix["sender"+iterator/3]+"/"+data.pix["destiny"+iterator/3]+"/"+data.pix["value"+iterator/3], aux_route);
+            if(response != ""){
+                count_response++;
+                response = "";
+            }
             if(response){
                 count_response++;
             }
@@ -328,112 +318,71 @@ app.post('/pix_prepare', (req, res) => {
     }
     if(count_response === n_operations/3){
         res.sendFile(path.join(__dirname, '../templates', 'pix_page.html'));
-        console.log("sucesso: "+queue_pix)
     }else{
         res.status(404).json({ error: 'Erro na transação' });
     }
 });
 
 app.post('/pix-execute', async (req, res) => {
-    res.status(200).json({ success: 'Transações estão em processamento' });
-    
+    var { message } = req.body;
+    var pix_transaction = message.split("/");
+    queue_pix.push(pix_transaction);
     const current_pix = queue_pix[0];
-    console.log("Usuario: "+current_pix)
-    var aux_route;
+    console.log("Usuario: "+current_pix);
+    var aux_route = current_pix[1].split("@")
     var user = data_base.find(search_user => search_user.account === current_pix[0]);
     if(user){
-
-        change_three_phase(current_pix[0], "state_commit", "Esperando Resposta");
-        change_three_phase(current_pix[0], "state_locking", "Espera");
-        for(let i = -1; i < data_base.length; i++){
-            if(i < 0 && i < data_routes.length -1 ){
-                var route_transfer = make_account_number(data_base[i+1].agency,i+1);
-                if(route_transfer === current_pix[1]){
-                    aux_route = data_base[i+1].agency;
-
+        if(user.state_commit === "Inicial" && user.state_locking === "Livre" && user.real_balance - current_pix[2] >= 0){
+            change_three_phase(current_pix[0], "state_commit", "Esperando Resposta");
+            change_three_phase(current_pix[0], "state_locking", "Espera");
+            sendMessageToOtherAPI("first_verify:"+current_pix[1], aux_route[0])
+            .then(response => {
+                console.log(`Resposta do servidor: ${response}`);
+                if(response.response.data === "Afirmativo"){
+                    change_three_phase(current_pix[0], "state_locking", "Preparado");
+                    sendMessageToRoute(IP, "pix-pre-commit")
+                    .then(result => {
+                        console.log('Resposta de /pix-pre-commit:', result); 
+                    })
+                    .catch(error => {
+                        console.error('Erro ao enviar para /pix-pre-commit:', error);
+                    });
+                }else{
+                    var aux = queue_pix.shift();
+                    queue_pix.push(aux);
+                    console.log("Essa conta esta fazendo uam transação no momento, adicionando a fila");
                 }
-            }
-            else{
-                var route_transfer = make_account_number(data_base[i].agency,i+1);
-                if(route_transfer === current_pix[1]){
-                    aux_route = data_base[i].agency;
-
-                }
-            }
-
+                
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+      
+            });
             
         }
-
-        sendMessageToOtherAPI("first_verify:"+current_pix[1], aux_route)
-        .then(resposta => {
-            console.log('Resposta do servidor:', resposta);
-            if(resposta.response.data === "Afirmativo"){
-                change_three_phase(current_pix[0], "state_locking", "Preparado");
-                sendMessageToRoute(IP, "pix-pre-commit")
-                .then(result => {
-                    console.log('Resposta de /pix-pre-commit:', result); 
-                })
-                .catch(error => {
-                    console.error('Erro ao enviar para /pix-pre-commit:', error);
-             
-                });
-            }else{
-                change_three_phase(current_pix[0], "state_commit", "Inicial");
-                change_three_phase(current_pix[0], "state_locking", "Livre");
-                console.log("Transação pendente, entrando em fila....")
-                sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route)
-                .then(resposta => {
-                    if(resposta.response.data === "Feito"){
-                        queue_pix.pop()
-                        queue_pix.push(current_pix);
-                    }
-      
-                }).catch(error => {
-                    console.error('Erro:', error);
-              
-                });
-                
-            }
-        })
-        .catch(error => {
-            console.error('Erro:', error);
-  
-        });
-        
+        else{
+            var aux = queue_pix.shift();
+            queue_pix.push(aux);
+            console.log("Essa conta esta fazendo uam transação no momento, adicionando a fila");
+        }
+    }else{
+        console.log("Esse usuario não existe!!!!");
+        res.sendFile(path.join(__dirname, '../templates', 'pix_page.html'));
     }
-
     
 });
 
 app.post("/pix-pre-commit", async (req, res) => {
     res.status(200).json({ success: 'Transações estão em processamento' });
-    let aux_route;
     const current_pix = queue_pix[0];
+    console.log("Usuario: "+current_pix);
+    var aux_route = current_pix[1].split("@")
     var user = data_base.find(search_user => search_user.account === current_pix[0]);
     if(user.state_commit === "Esperando Resposta" && user.state_locking === "Preparado"){
         change_three_phase(current_pix[0], "state_commit", "Pre-Compromisso");
         change_three_phase(current_pix[0], "state_locking", "Adquirir_Bloqueio_Leitura");
         if(user.real_balance - parseInt(current_pix[2]) >= 0){
-            for(let i = -1; i < data_base.length; i++){
-                if(i < 0 && i < data_routes.length -1 ){
-                    var route_transfer = make_account_number(data_base[i+1].agency,i+1);
-
-                    if(route_transfer === current_pix[1]){
-                        aux_route = data_base[i+1].agency;
-             
-                    }
-                }
-                else{
-                    var route_transfer = make_account_number(data_base[i].agency,i+1);
-    
-                    if(route_transfer === current_pix[1]){
-                        aux_route = data_base[i].agency;
-
-                    }
-                }
-                
-            }
-            sendMessageToOtherAPI("second_verify:"+current_pix[1], aux_route)
+            sendMessageToOtherAPI("second_verify:"+current_pix[1], aux_route[0])
             .then(resposta => {
                 console.log('Resposta do servidor:', resposta);
                 if(resposta.response.data === "Permitido"){
@@ -455,10 +404,10 @@ app.post("/pix-pre-commit", async (req, res) => {
                     change_three_phase(current_pix[0], "state_commit", "Inicial");
                     change_three_phase(current_pix[0], "state_locking", "Livre");
                     console.log("Transação pendente, entrando em fila....")
-                    sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route)
+                    sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
                     .then(resposta => {
                         if(resposta.response.data === "Feito"){
-                            queue_pix.pop()
+                            queue_pix.shift()
                             queue_pix.push(current_pix);
                
                         }
@@ -479,32 +428,14 @@ app.post("/pix-pre-commit", async (req, res) => {
 
 app.post("/pix-commit", async(req, res) => {
     res.status(200).json({ success: 'Transações estão em processamento' });
-    let aux_route;
     const current_pix = queue_pix[0];
+    console.log("Usuario: "+current_pix);
+    var aux_route = current_pix[1].split("@")
     var user = data_base.find(search_user => search_user.account === current_pix[0]);
     if(user.state_commit === "Firmar-Compromisso" && user.state_locking === "Adquirir_Bloqueio_Escrita"){
         change_three_phase(current_pix[0], "state_commit", "Esperando Resposta Final");
         if(user.real_balance - parseInt(current_pix[2]) >= 0){
-            for(let i = -1; i < data_base.length; i++){
-                if(i < 0 && i < data_routes.length -1 ){
-                    var route_transfer = make_account_number(data_base[i+1].agency,i+1);
-
-                    if(route_transfer === current_pix[1]){
-                        aux_route = data_base[i+1].agency;
- 
-                    }
-                }
-                else{
-                    var route_transfer = make_account_number(data_base[i].agency,i+1);
-       
-                    if(route_transfer === current_pix[1]){
-                        aux_route = data_base[i].agency;
-    
-                    }
-                }
-                
-            }
-            sendMessageToOtherAPI("last_verify:"+current_pix[1]+":"+current_pix[2], aux_route)
+            sendMessageToOtherAPI("last_verify:"+current_pix[1]+":"+current_pix[2], aux_route[0])
             .then(resposta => {
                 console.log('Resposta do servidor:', resposta);
                 if(resposta.response.data === "Valor Recebido"){
@@ -527,10 +458,10 @@ app.post("/pix-commit", async(req, res) => {
                     change_three_phase(current_pix[0], "transaction_balance", 0);
                     change_three_phase(current_pix[0], "atomicity", 0);
                     console.log("Transação pendente, entrando em fila....")
-                    sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route)
+                    sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
                     .then(resposta => {
                         if(resposta.response.data === "Feito"){
-                            queue_pix.pop()
+                            queue_pix.shift()
                             queue_pix.push(current_pix);
       
                         }
@@ -550,31 +481,12 @@ app.post("/pix-commit", async(req, res) => {
 
 app.post("/pix-complete", async(req, res) =>{
     res.status(200).json({ success: 'Transações estão em processamento' });
-    let aux_route;
     const current_pix = queue_pix[0];
+    console.log("Usuario: "+current_pix);
+    var aux_route = current_pix[1].split("@")
     var user = data_base.find(search_user => search_user.account === current_pix[0]);
     if(user.state_commit === "Completo" && user.state_locking === "Liberar_Bloqueio"){
-
-        for(let i = -1; i < data_base.length; i++){
-            if(i < 0 && i < data_routes.length -1 ){
-                var route_transfer = make_account_number(data_base[i+1].agency,i+1);
-
-                if(route_transfer === current_pix[1]){
-                    aux_route = data_base[i+1].agency;
-
-                }
-            }
-            else{
-                var route_transfer = make_account_number(data_base[i].agency,i+1);
-
-                if(route_transfer === current_pix[1]){
-                    aux_route = data_base[i].agency;
-  
-                }
-            }
-            
-        }
-        sendMessageToOtherAPI("complete:"+current_pix[1]+":"+current_pix[2], aux_route)
+        sendMessageToOtherAPI("complete:"+current_pix[1]+":"+current_pix[2], aux_route[0])
         .then(resposta => {
     
             if(resposta.response.data === "Completo"){
@@ -582,7 +494,7 @@ app.post("/pix-complete", async(req, res) =>{
                 change_three_phase(current_pix[0], "state_locking", "Livre");
                 change_three_phase(current_pix[0], "state_commit", "Inicial");
                 change_three_phase(current_pix[0], "atomicity", 0);
-                queue_pix.pop()
+                queue_pix.shift()
                 res.sendFile(path.join(__dirname, '../templates', 'aplication.html'));    
             }
             else{
@@ -593,10 +505,10 @@ app.post("/pix-complete", async(req, res) =>{
                 change_three_phase(current_pix[0], "real_balance", val);
                 change_three_phase(current_pix[0], "atomicity", 0);
                 console.log("Transação pendente, entrando em fila....")
-                sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route)
+                sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
                 .then(resposta => {
                     if(resposta.response.data === "Feito"){
-                        queue_pix.pop()
+                        queue_pix.shift()
                         queue_pix.push(current_pix);
              
                     }
@@ -623,7 +535,7 @@ function change_three_phase(acc, mode, value){
 }
 
 app.post('/receive-message', (req, res) => {
-    const { message } = req.body;
+    var { message } = req.body;
     const aux = message.split(":");
     var data;
 
@@ -631,20 +543,6 @@ app.post('/receive-message', (req, res) => {
         data = return_accs(aux[1],aux[2]);
         queue_transaction.push(data);
         res.json({ received: true, data: data });
-    }
-    else if(aux[0] === "pix_manager"){
-        const op_aux = aux[1].split("/");
-
-        queue_pix.push(op_aux);
-        res.json({ received: true, data: queue_pix });
-
-        sendMessageToRoute(IP, "pix-execute")
-        .then(result => {
-            console.log('Resposta de /pix-execute:', result); 
-        })
-        .catch(error => {
-            console.error('Erro ao enviar para /pix-execute:', error);
-        });
     }
     else if(aux[0] == "first_verify"){
   
@@ -823,6 +721,6 @@ app.listen(porta, () => {
 });
 
 function make_account_number(ag, lgth){
-    aux = ag.replace(".", lgth);
+    aux = ag + "@" + lgth
     return aux;
 }
