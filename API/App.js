@@ -18,7 +18,9 @@ var data_base = []
 var queue_transaction = [];
 var queue_pix = [];
 const data_routes = [
-    "127.0.0.1"
+    "172.16.103.1","172.16.103.2","172.16.103.3","172.16.103.4","172.16.103.5", "172.16.103.6",
+    "172.16.103.7", "172.16.103.8", "172.16.103.9", "172.16.103.10", "172.16.103.11","172.16.103.12",
+    "172.16.103.13","172.16.103.14"
 ];
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -348,6 +350,20 @@ app.post('/pix-execute', async (req, res) => {
                     })
                     .catch(error => {
                         console.error('Erro ao enviar para /pix-pre-commit:', error);
+                        change_three_phase(current_pix[0], "state_commit", "Inicial");
+                        change_three_phase(current_pix[0], "state_locking", "Livre");
+                        console.log("Transação pendente, entrando em fila....")
+                        sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
+                        .then(resposta => {
+                            if(resposta.response.data === "Feito"){
+                                queue_pix.shift()
+                                queue_pix.push(current_pix);
+                
+                            }
+                        }).catch(error => {
+                            console.error('Erro:', error);
+        
+                        });
                     });
                 }else{
                     var aux = queue_pix.shift();
@@ -358,9 +374,27 @@ app.post('/pix-execute', async (req, res) => {
             })
             .catch(error => {
                 console.error('Erro:', error);
+                change_three_phase(current_pix[0], "state_commit", "Inicial");
+                change_three_phase(current_pix[0], "state_locking", "Livre");
+                console.log("Transação pendente, entrando em fila....")
+                sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
+                .then(resposta => {
+                    if(resposta.response.data === "Feito"){
+                        queue_pix.shift()
+                        queue_pix.push(current_pix);
+            
+                    }
+                }).catch(error => {
+                    console.error('Erro:', error);
+
+                });
       
             });
             
+        }else if(user.real_balance - current_pix[2] < 0){
+            queue_pix.shift();
+            console.log("Saldo Insuficiente para esta transação!!");
+            res.sendFile(path.join(__dirname, '../templates', 'pix_page.html'));
         }
         else{
             var aux = queue_pix.shift();
@@ -368,6 +402,7 @@ app.post('/pix-execute', async (req, res) => {
             console.log("Essa conta esta fazendo uam transação no momento, adicionando a fila");
         }
     }else{
+        queue_pix.shift();
         console.log("Esse usuario não existe!!!!");
         res.sendFile(path.join(__dirname, '../templates', 'pix_page.html'));
     }
@@ -401,6 +436,22 @@ app.post("/pix-pre-commit", async (req, res) => {
                     })
                     .catch(error => {
                         console.error('Erro ao enviar para /pix-commit:', error);
+                        change_three_phase(current_pix[0], "state_commit", "Inicial");
+                        change_three_phase(current_pix[0], "state_locking", "Livre");
+                        change_three_phase(current_pix[0], "transaction_balance", 0);
+                        change_three_phase(current_pix[0], "atomicity", 0);
+                        console.log("Transação pendente, entrando em fila....")
+                        sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
+                        .then(resposta => {
+                            if(resposta.response.data === "Feito"){
+                                queue_pix.shift()
+                                queue_pix.push(current_pix);
+        
+                            }
+                        }).catch(error => {
+                            console.error('Erro:', error);
+            
+                        });
 
                     });
                 }else{
@@ -422,9 +473,38 @@ app.post("/pix-pre-commit", async (req, res) => {
             })
             .catch(error => {
                 console.error('Erro:', error);
+                change_three_phase(current_pix[0], "state_commit", "Inicial");
+                change_three_phase(current_pix[0], "state_locking", "Livre");
+                console.log("Transação pendente, entrando em fila....")
+                sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
+                .then(resposta => {
+                    if(resposta.response.data === "Feito"){
+                        queue_pix.shift()
+                        queue_pix.push(current_pix);
+           
+                    }
+                }).catch(error => {
+                    console.error('Erro:', error);
+
+                });
 
             });
         }
+    }else{
+        change_three_phase(current_pix[0], "state_commit", "Inicial");
+        change_three_phase(current_pix[0], "state_locking", "Livre");
+        queue_pix.shift()
+        console.log("Transação deu erro. Rollback iniciado!!")
+        sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
+        .then(resposta => {
+            if(resposta.response.data === "Feito"){
+                console.log("Rolback inicializado!!")
+    
+            }
+        }).catch(error => {
+            console.error('Erro:', error);
+
+        });
     }
 
 });
@@ -453,6 +533,24 @@ app.post("/pix-commit", async(req, res) => {
                     })
                     .catch(error => {
                         console.error('Erro ao enviar para /pix-complete:', error);
+                        change_three_phase(current_pix[0], "state_commit", "Inicial");
+                        change_three_phase(current_pix[0], "state_locking", "Livre");
+                        const valrb = user.real_balance + user.atomicity;
+                        change_three_phase(current_pix[0], "real_balance", valrb);
+                        change_three_phase(current_pix[0], "transaction_balance", 0);
+                        change_three_phase(current_pix[0], "atomicity", 0);
+                        console.log("Transação pendente, entrando em fila....")
+                        sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
+                        .then(resposta => {
+                            if(resposta.response.data === "Feito"){
+                                queue_pix.shift()
+                                queue_pix.push(current_pix);
+        
+                            }
+                        }).catch(error => {
+                            console.error('Erro:', error);
+            
+                        });
       
                     });
                 }
@@ -477,9 +575,42 @@ app.post("/pix-commit", async(req, res) => {
             })
             .catch(error => {
                 console.error('Erro:', error);
+                change_three_phase(current_pix[0], "state_commit", "Inicial");
+                change_three_phase(current_pix[0], "state_locking", "Livre");
+                change_three_phase(current_pix[0], "transaction_balance", 0);
+                change_three_phase(current_pix[0], "atomicity", 0);
+                console.log("Transação pendente, entrando em fila....")
+                sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
+                .then(resposta => {
+                    if(resposta.response.data === "Feito"){
+                        queue_pix.shift()
+                        queue_pix.push(current_pix);
+
+                    }
+                }).catch(error => {
+                    console.error('Erro:', error);
+    
+                });
          
             });
         } 
+    }else{
+        change_three_phase(current_pix[0], "state_commit", "Inicial");
+        change_three_phase(current_pix[0], "state_locking", "Livre");
+        change_three_phase(current_pix[0], "transaction_balance", 0);
+        change_three_phase(current_pix[0], "atomicity", 0);
+        queue_pix.shift()
+        console.log("Transação deu erro. Rollback iniciado!!")
+        sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
+        .then(resposta => {
+            if(resposta.response.data === "Feito"){
+                console.log("Rolback inicializado!!")
+
+            }
+        }).catch(error => {
+            console.error('Erro:', error);
+
+        });
     }
 });
 
@@ -497,9 +628,10 @@ app.post("/pix-complete", async(req, res) =>{
        
                 change_three_phase(current_pix[0], "state_locking", "Livre");
                 change_three_phase(current_pix[0], "state_commit", "Inicial");
+                change_three_phase(current_pix[0], "transaction_balance", 0);
                 change_three_phase(current_pix[0], "atomicity", 0);
                 queue_pix.shift()
-                res.status(200).json({ success: 'Transações estão em processamento' });
+                res.status(200).json({ success: 'Transações Completa' });
                 res.sendFile(path.join(__dirname, '../templates', 'aplication.html'));    
             }
             else{
@@ -525,9 +657,46 @@ app.post("/pix-complete", async(req, res) =>{
         })
         .catch(error => {
             console.error('Erro:', error);
+            change_three_phase(current_pix[0], "state_commit", "Inicial");
+            change_three_phase(current_pix[0], "state_locking", "Livre");
+            const valrb = user.real_balance + user.atomicity;
+            change_three_phase(current_pix[0], "real_balance", valrb);
+            change_three_phase(current_pix[0], "transaction_balance", 0);
+            change_three_phase(current_pix[0], "atomicity", 0);
+            console.log("Transação pendente, entrando em fila....")
+            sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
+            .then(resposta => {
+                if(resposta.response.data === "Feito"){
+                    queue_pix.shift()
+                    queue_pix.push(current_pix);
+
+                }
+            }).catch(error => {
+                console.error('Erro:', error);
+
+            });
 
         });
  
+    }else{
+        change_three_phase(current_pix[0], "state_commit", "Inicial");
+        change_three_phase(current_pix[0], "state_locking", "Livre");
+        const valrb = user.real_balance + user.atomicity;
+        change_three_phase(current_pix[0], "real_balance", valrb);
+        change_three_phase(current_pix[0], "transaction_balance", 0);
+        change_three_phase(current_pix[0], "atomicity", 0);
+        queue_pix.shift()
+        console.log("Transação deu erro. Rollback iniciado!!")
+        sendMessageToOtherAPI("rollback:"+current_pix[1], aux_route[0])
+        .then(resposta => {
+            if(resposta.response.data === "Feito"){
+                console.log("Rolback inicializado!!")
+
+            }
+        }).catch(error => {
+            console.error('Erro:', error);
+
+        });
     }
 });
 
