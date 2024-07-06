@@ -324,10 +324,11 @@ app.post('/pix_prepare', async(req, res) => {
 });
 
 app.post('/pix-execute', async (req, res) => {
+
     var { message } = req.body;
     var pix_transaction = message.split("/");
     queue_pix.push(pix_transaction);
-    const current_pix = queue_pix[0];
+    let current_pix = queue_pix[0];
     console.log("Usuario: "+current_pix);
     var aux_route = current_pix[1].split("@")
     var user = data_base.find(search_user => search_user.account === current_pix[0]);
@@ -342,6 +343,7 @@ app.post('/pix-execute', async (req, res) => {
                     change_three_phase(current_pix[0], "state_locking", "Preparado");
                     sendMessageToRoute(IP, "pix-pre-commit")
                     .then(result => {
+                        res.status(200).json({ success: 'Transações estão em processamento' });
                         console.log('Resposta de /pix-pre-commit:', result); 
                     })
                     .catch(error => {
@@ -373,7 +375,7 @@ app.post('/pix-execute', async (req, res) => {
 });
 
 app.post("/pix-pre-commit", async (req, res) => {
-    res.status(200).json({ success: 'Transações estão em processamento' });
+
     const current_pix = queue_pix[0];
     console.log("Usuario: "+current_pix);
     var aux_route = current_pix[1].split("@")
@@ -394,6 +396,7 @@ app.post("/pix-pre-commit", async (req, res) => {
                     console.log("Valor da transferencia:"+ user.transaction_balance);
                     sendMessageToRoute(IP, "pix-commit")
                     .then(result => {
+                        res.status(200).json({ success: 'Transações estão em processamento' });
                         console.log('Resposta de /pix-commit:', result); 
                     })
                     .catch(error => {
@@ -427,7 +430,7 @@ app.post("/pix-pre-commit", async (req, res) => {
 });
 
 app.post("/pix-commit", async(req, res) => {
-    res.status(200).json({ success: 'Transações estão em processamento' });
+
     const current_pix = queue_pix[0];
     console.log("Usuario: "+current_pix);
     var aux_route = current_pix[1].split("@")
@@ -445,6 +448,7 @@ app.post("/pix-commit", async(req, res) => {
                     change_three_phase(current_pix[0], "state_locking", "Liberar_Bloqueio");
                     sendMessageToRoute(IP, "pix-complete")
                     .then(result => {
+                        res.status(200).json({ success: 'Transações estão em processamento' });
                         console.log('Resposta de /pix-complete:', result); 
                     })
                     .catch(error => {
@@ -480,7 +484,7 @@ app.post("/pix-commit", async(req, res) => {
 });
 
 app.post("/pix-complete", async(req, res) =>{
-    res.status(200).json({ success: 'Transações estão em processamento' });
+
     const current_pix = queue_pix[0];
     console.log("Usuario: "+current_pix);
     var aux_route = current_pix[1].split("@")
@@ -495,6 +499,7 @@ app.post("/pix-complete", async(req, res) =>{
                 change_three_phase(current_pix[0], "state_commit", "Inicial");
                 change_three_phase(current_pix[0], "atomicity", 0);
                 queue_pix.shift()
+                res.status(200).json({ success: 'Transações estão em processamento' });
                 res.sendFile(path.join(__dirname, '../templates', 'aplication.html'));    
             }
             else{
