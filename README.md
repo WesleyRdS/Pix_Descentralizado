@@ -9,6 +9,31 @@ Para isso:
 3. Os bancos se comunicam para verificar e autorizar transações entre suas contas. Essa comunicação foi feita de modo que apenas transações válidas sejam processadas e que todas as partes envolvidas concordem com o estado final das transações.
 4. O sistema garante que as contas não movimentem mais dinhero do que tem disponivel. Ele tambem evita duplo gasto garantindo a impossibilidade de um mesmo dinheiro ser usado mais de uma vez.
 
+## Tecnologias ultilizadas
+
+1. NodeJS
+2. Express
+3. HTML
+4. CSS
+5. Docker
+
+## Como executar com o docker
+
+1. docker run -e IP=IP_DA_MAQUINA --network host -it wesleyrds/pix:TAG
+2. Use o IP da maquina que esta instanciando o banco
+3. A imagem docker esta com os IPs preconfigurandos para os computadores do LARSID então não funcionarão fora da rede de lá
+4. O container iniciara na porta 9985
+
+## Como executar na sua maquina sem o docker
+
+1. Baixe o repositorio
+2. Mude a lista de rotas no arquivo APP.js para os IPs dos seus computadores
+3. Instale o npm
+4. Abra o terminal na pasta API
+5. Digite IP=IP_DA_MAQUINA node App.js
+6. Use o IP da maquina que esta instanciando o banco
+7. A aplicação iniciara na porta 9985
+
 ## Gerenciamento de contas
 
 ### Criação de conta
@@ -190,6 +215,8 @@ Para isso, foi implementado que, assim que a página de transferência fosse car
 
 ![Fluxograma da página de transação](fluxogramas/Pix-Process-Prepare.drawio.png)
 
+A partir daí começarão as fases do two-phase-commit/locking onde os estados passarão sequencialmente a cada novo passo da transação bloqueando acesso para os outros usuarios e tornando o remetente em questão o unico que pode sobreescrever e acessar os dados do receptor e dele mesmo. 
+
 ### Fase de preparação
 
 1. O remetente assume o papel de coordenador e envia uma mensagem de preparação para todos os participantes envolvidos na transação.
@@ -205,9 +232,50 @@ Essa é a fase que o remetente envia uma mensagem perguntando para o receptor se
 
 #### Segunda verificação - Receptor permite o inicio do processo?
 
-Nesta fase se a primeira verificação foi bem sucedia significa que o remetente e o receptor estão livres então o remetente pede para o receptor para iniciar uma transação com ele e não aceitar com nenhum outro processo até o final desta.
+Nesta fase se a primeira verificação foi bem sucedia significa que o remetente e o receptor estão livres então o remetente pede para o receptor para iniciar uma transação com ele e não aceitar com nenhum outro processo até o final desta. Nesta fase tambem sera ultilizada as variaveis `transaction_balance` e `atomicity` como caches. Guardando respectivamente o valor do saldo alterado e o valor da transação em questão.
+A variavel de transação assumirar o valor da variavel de valor real e tera seu valor alterado no lado do remetente garantindo que a variavel do valor real da conta não seja alterado até que os riscos de erro ou falha sejam minimos. 
+Você pode ver o processo no fluxograma abaixo:
 
-![Fluxograma first-verify](fluxogramas/pix-pre-commit.drawio.png)
+![Fluxograma second-verify](fluxogramas/pix-pre-commit.drawio.png)
+
+
+### Fase de commit
+
+Nesta fase, os valores serão devidamente alterados no remetente, e também o saldo a ser adicionado será enviado ao receptor. As variáveis `real_balance`, `transaction_balance` e `atomicity`serão usadas mais ativamente para gerenciar as sobrescritas e garantir que um rollback seja possível em caso de falha.
+
+#### Verificação de envio
+
+Aqui é onde a requisição com o valor será enviada para o receptor. Em caso de sucesso, ele enviará uma resposta confirmando que o valor foi recebido, o que fará com que o remetente atualize seu valor real para ser igual ao valor da transação. Você pode ver o processo no fluxograma abaixo:
+
+![Fluxograma value-verify](fluxogramas/pix-commit.drawio.png)
+
+
+#### Confirmação de transação completa
+
+Aqui é onde o remetente confirma as alterações com o receptor e começa a liberar seus atributos para que novas alterações possam acontecer. Você pode ver o processo no fluxograma abaixo:
+
+![Fluxograma complete](fluxogramas/pix-complete.drawio.png)
+
+### Gerenciamento de bloqueios e sobrescritas do lado do receptor
+
+O gerenciamento de todas as requisições feitas durante as transações é realizado por meio de uma rota chamada `/receive-message`. Sempre que o remetente faz uma solicitação, ele envia a requisição para esta rota, que contém várias condições para cada possível verificação ou requisição. Uma dessas condições é responsável pela terceira fase da transação, que é a fase de reversão.
+
+#### Fase de reversão
+
+sta fase pode ou não ocorrer. Em caso de falha em qualquer um dos processos das fases anteriores, esta etapa é chamada para reverter os dados ao estado anterior à transação, do lado do receptor. A solicitação deste rollback é responsabilidade do remetente, que após reverter seus dados, envia uma requisição para a rota `/receive-message`. Lá, é verificado se o valor real já foi alterado para desfazê-lo e liberar os bloqueios, além de zerar as variáveis de valor de transação e atomicidade.
+
+#### Fluxograma da rota de gerencimanto de requisições ao receptor: 
+
+![Fluxograma complete](fluxogramas/Receive.drawio.png)
+
+
+## Possiveis melhorias futuras
+
+1. Quedas durante a transação: Existe um caso em que se alguma requisição falhar e o remetente solicitar rollback e o receptor cair antes de receber essa mensagem de rollback ou simplismente não conseguir enviar a resposta, o receptor em questão ficara bloqueado. É algo que não consegui pensar em uma forma 100% efeitva de solucionar porém o remetente continuara apto a fazer transações.
+2. Respostas ao usuario: O front-end carece de notificações, em alguns casos de manuseamento incorreto ele so não faz nada e a resposta so aprece no servidor mas não na pagina em si.
+
+
+
 
 
 
