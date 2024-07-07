@@ -136,12 +136,13 @@ O saldo final deveria ser logicamente 500 reais (400 reais de saldo inicial + 20
 ##### Estratégia de Mitigação
 Para lidar com esses cenários, é necessário implementar controles de concorrência ou mecanismos de bloqueio para garantir que as transações não interfiram umas com as outras. Isso assegura que os saldos sejam atualizados com precisão com base na sequência das transações.
 
-##### Conclusão
 Embora essa situação possa parecer específica e improvável, é crucial abordar possíveis condições de corrida para manter a integridade dos saldos das contas e das transações.
 
 ### O fluxograma a seguir mostra como o problema foi resolvido:
 
-![Fluxograma da página home](fluxogramas/deposit.drawio.png)
+Para deposita só é necessario informar a conta e o valor a ser depositado. É importante salientar que o depósito só é realizado para contas do mesmo banco da conta que esta logada.
+
+![Fluxograma da página de depósito](fluxogramas/deposit.drawio.png)
 
 
 Este sistema utiliza duas variáveis de estado, `commit` e `locking`, para garantir que um depósito só seja realizado se a conta destino não estiver em processo de outra operação. A condição para o depósito ocorrer é que ambas as variáveis estejam nos estados `Inicial` e `Livre`, respectivamente.
@@ -157,7 +158,57 @@ O sistema gerencia a transição de estados passo a passo, verificando se cada e
 Um segundo loop é responsável pelo gerenciamento dos bloqueios de leitura e escrita. Apenas quando o bloqueio de escrita está ativo, o usuário com permissão (sudo) pode alterar o valor da conta.
 Após a alteração, os bloqueios de leitura e escrita precisam ser desabilitados até que os estados voltem aos seus valores iniciais, liberando assim o usuário para outras operações.
 
- 
+
+### Possível Condição de Corrida em Transferências Bancárias:
+
+##### Visão Geral
+Em nosso sistema de transferências bancárias, existe um risco significativo de condições de corrida. Inicialmente, isso pode não parecer problemático, já que estamos movendo dinheiro entre contas. No entanto, considere o seguinte cenário:
+
+Você possui 500 reais em sua conta e deseja transferir 200 reais para a conta A e 300 reais para a conta B simultaneamente. Sem um controle adequado, é possível que ambas as transações tentem usar os 500 reais como base inicial.
+
+##### Resultado Esperado
+O saldo final deveria ser logicamente 0 reais (500 reais iniciais - 200 reais para A - 300 reais para B). No entanto, devido à execução simultânea das transações sem controle de fluxo, pode ocorrer um problema. Por exemplo, 200 reais podem ser deduzidos corretamente para A, mas, devido à falta de atomicidade, os 300 reais podem ser deduzidos novamente do saldo inicial de 500 reais, resultando em um saldo final de 200 reais, ao invés de 0 reais.
+
+##### Estratégia de Mitigação
+Para evitar essa situação, é crucial implementar um mecanismo que garanta a atomicidade das transações. Isso significa que cada transferência deve ser tratada como uma operação única e indivisível. Um possível método é utilizar transações bancárias atômicas, onde todas as operações relacionadas (débitos e créditos) ocorrem como uma única unidade. Isso impede que o saldo seja comprometido por operações simultâneas e não coordenadas.
+
+Neste caso, novamente usaremos as variáveis de estado. Porém, em vez de adicionarmos uma variável nova de super usuário a toda transação, como fizemos com o depósito, utilizaremos outra variável que já existe no cliente desde seu cadastro: a variável de atomicidade. Ela ficará responsável por guardar o valor para um possível rollback, já que desta vez estaremos tratando de transações entre diferentes bancos, cada um com sua respectiva API. 
+
+Nos tópicos adiante serão mostrados cada passo que foi tomado para cada uma das etapas de transação
+
+### Obtenção de contas de um mesmo usuário em difentes agências e gerenciamento das informações na pagina:
+
+Um dos requisitos do problema era que fosse possível realizar transferências a partir de uma conta para qualquer outra conta que tivesse o mesmo CPF cadastrado.
+
+Para isso, foi implementado que, assim que a página de transferência fosse carregada, ela enviaria uma requisição vazia para a API da sua agência. A partir disso, uma requisição seria feita para todas as outras agências com os dados daquela conta, buscando em seus próprios bancos de dados contas que possuam o mesmo CPF. A API então envia esses dados para um script no frontend, que exibe todos os números de conta em um dropdown. A partir daí, o usuário precisa apenas escolher na dropdown a conta desejada, que será a conta de origem de onde será retirado o valor a ser transferido. Em seguida, ele deve digitar manualmente a conta de destino, juntamente com o valor a ser transferido.
+
+#### Gerenciamento de concorrência:
+
+É possível adicionar múltiplas transações ao clicar no símbolo `+` ou excluí-las clicando no símbolo `x`. Essas transações múltiplas podem gerar concorrência, por isso foram configuradas para ocorrer sequencialmente. Ou seja, no caso de haver mais de uma transação, a próxima só será iniciada quando a anterior terminar. Isso é gerenciado pela API do banco, que envia as requisições uma por vez e só envia a próxima após receber a resposta de sucesso ou falha da transação anterior.
+
+##### O fluxograma abaixo mostra a pagina de transação e suas requisições:
+
+![Fluxograma da página de transação](fluxogramas/Pix-Process-Prepare.drawio.png)
+
+### Fase de preparação
+
+1. O remetente assume o papel de coordenador e envia uma mensagem de preparação para todos os participantes envolvidos na transação.
+2. Cada participante responde indicando se está pronto para realizar a transação.
+3. As duas rotas responsaveis por essa fase são a `/pix-execute` e `/pix-pre-commit`
+
+#### Primeira verificação - Remetente e Receptor estão aptos a iniciar operação?
+
+Essa é a fase que o remetente envia uma mensagem perguntando para o receptor se ele pode ou não se preparar para começar a operação. Você pode ver o processo no fluxograma abaixo:
+
+![Fluxograma first-verify](fluxogramas/pix-execute.drawio.png)
+
+
+#### Segunda verificação - Receptor permite o inicio do processo?
+
+Nesta fase se a primeira verificação foi bem sucedia significa que o remetente e o receptor estão livres então o remetente pede para o receptor para iniciar uma transação com ele e não aceitar com nenhum outro processo até o final desta.
+
+![Fluxograma first-verify](fluxogramas/pix-pre-commit.drawio.png)
+
 
 
 
