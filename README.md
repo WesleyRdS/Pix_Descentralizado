@@ -10,9 +10,11 @@ Para isso:
 4. O sistema garante que as contas não movimentem mais dinhero do que tem disponivel. Ele tambem evita duplo gasto garantindo a impossibilidade de um mesmo dinheiro ser usado mais de uma vez.
 
 ## Gerenciamento de contas
+
+### Criação de conta
 Para cada banco no consórcio, a criação de contas é gerenciada associando o IP do banco ao número da agência. Isso significa que cada banco é identificado por um IP específico que está ligado diretamente aos números das agências disponíveis.
 
-### Formato dos Números de Conta
+#### Formato dos Números de Conta
 
 Cada conta de cliente associada a uma agência é identificada pelo seguinte formato:
 
@@ -32,8 +34,35 @@ IP_do_Banco@número_de_contas_cadastradas_no_banco
 
 Uma conta só será criada se todos estes campos forem preenchidos e o CPF/CNPj de uma conta pessoal/juridica não pode ser igual ao de outra conta do mesmo tipo ja cadastrada naquele banco. Mas é possivel criar varias contas conjuntas formadas por CPFs que ja estão cadastradas naquele banco.
 
-#### O fluxograma a seguir mostra as telas de cadastro
+#### O fluxograma a seguir mostra o funcionamento do cadastro de novos clientes:
+
 ![Fluxograma de criação de novas contas](fluxogramas/SINGUP.png)
+
+### Sistema de login/sessão
+
+Embora seja possível criar uma conta em qualquer banco do consórcio a partir de qualquer outro, é fundamental acessar cada banco utilizando a URL correta associada a ele. Isso garante o acesso seguro e direto aos serviços bancários específicos de cada instituição. Assim o login so é permitido se o numero da agencia corresponder ao IP da URL.
+
+#### As informações necessarias para login são:
+
+1. CPF/CNPj
+2. Numero da conta
+3. Número da agência-IP
+4. Senha
+
+Após fornecer as informações necessárias e clicar no botão de login, a API do banco correspondente irá buscar um usuário que corresponda às suas credenciais dentro daquele banco específico. Se um usuário compatível for encontrado, a autenticação será realizada com sucesso.
+
+#### Criação de Sessão
+
+Após a autenticação bem-sucedida, uma sessão será criada para o usuário. Esta sessão permite o acesso às seguintes rotas:
+
+1. Tela Inicial: Oferece uma visão geral das informações da conta e das opções disponíveis.
+2. Transações: Permite ao usuário realizar operações financeiras, como transferências e pagamentos.
+3. Depósitos: Facilita a realização de depósitos em conta, conforme necessário.
+
+#### O fluxograma a seguir demonstra o funcionamento do sistema de login e autenticação:
+
+![Fluxograma de autenticação de contas](fluxogramas/signin.drawio.png)
+
 
 
 
